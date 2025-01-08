@@ -4,6 +4,8 @@
 #include "framework.h"
 #include "WindowDemo.h"
 #include <cmath>
+#include "Vectors.h"
+
 
 #define MAX_LOADSTRING 100
 
@@ -17,25 +19,6 @@ ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
-
-// DDA画线
-void DrawLine(HDC hdc, int x1, int y1, int x2, int y2) {
-    int x_len = x2 - x1;
-    int y_len = y2 - y1;
-    int step = max(abs(x_len), abs(y_len));
-    float x_inc = x_len / (float)step;
-    float y_inc = y_len / (float)step;
-    float x = x1;
-    float y = y1;
-    for (size_t i = 0; i <= step; i++)
-    {
-        SetPixelV(hdc, round(x), round(y), RGB(255, 0, 0));
-        x = x + x_inc;
-        y = y + y_inc;
-    }
-    Ellipse(hdc, x1 - 3, y1 + 3, x1 + 3, y1 - 3);
-    Ellipse(hdc, x2 - 3, y2 + 3, x2 + 3, y2 - 3);
-}
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -170,7 +153,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             //TextOut(hdc, 50, 50, L"Hello, Windows!", 15);
             //MoveToEx(hdc, 50, 50, NULL);
             //LineTo(hdc, 200, 200);
-            DrawLine(hdc, 50, 100, 100, 200);
+            DrawLine(hdc, Vector2(50, 100), Vector2(100, 200));
             EndPaint(hWnd, &ps);
         }
         break;

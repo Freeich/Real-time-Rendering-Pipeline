@@ -27,7 +27,7 @@
     <ClInclude Include="WindowDemo.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Vector3.h">
+    <ClInclude Include="Vectors.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
