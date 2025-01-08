@@ -154,6 +154,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             //MoveToEx(hdc, 50, 50, NULL);
             //LineTo(hdc, 200, 200);
             DrawLine(hdc, Vector2(50, 100), Vector2(100, 200));
+            Matrix mm = Matrix();
+            mm.m[1][0] = 2.f;
+            mm.m[1][1] = 2.f;
+            mm.m[1][2] = 2.f;
+            mm.m[1][3] = 2.f;
+
+            Matrix mm1 = Matrix();
+            mm1.m[0][1] = 1.f;
+            mm1.m[1][1] = 1.f;
+            mm1.m[2][1] = 1.f;
+            mm1.m[3][1] = 1.f;
+
+            Matrix mm2 = mm * mm1;
+
+            mm2.print(hdc);
+
             EndPaint(hWnd, &ps);
         }
         break;
