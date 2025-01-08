@@ -1,0 +1,6 @@
+﻿  WindowDemo.cpp
+D:\VS_projects_repo\WindowDemo\WindowDemo.cpp(28,13): warning C4244: “初始化”: 从“int”转换到“float”，可能丢失数据
+D:\VS_projects_repo\WindowDemo\WindowDemo.cpp(29,13): warning C4244: “初始化”: 从“int”转换到“float”，可能丢失数据
+D:\VS_projects_repo\WindowDemo\WindowDemo.cpp(32,39): warning C4244: “参数”: 从“float”转换到“int”，可能丢失数据
+D:\VS_projects_repo\WindowDemo\WindowDemo.cpp(32,29): warning C4244: “参数”: 从“float”转换到“int”，可能丢失数据
+  WindowDemo.vcxproj -> D:\VS_projects_repo\WindowDemo\x64\Debug\WindowDemo.exe
