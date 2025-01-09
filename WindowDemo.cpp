@@ -153,7 +153,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             //TextOut(hdc, 50, 50, L"Hello, Windows!", 15);
             //MoveToEx(hdc, 50, 50, NULL);
             //LineTo(hdc, 200, 200);
-            DrawLine(hdc, Vector2(50, 100), Vector2(100, 200));
+
+            /*DrawLine(hdc, Vector2(800, 900), Vector2(1920, 900));
             Matrix mm = Matrix();
             mm.m[1][0] = 2.f;
             mm.m[1][1] = 2.f;
@@ -168,7 +169,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             Matrix mm2 = mm * mm1;
 
-            mm2.print(hdc);
+            mm2.print(hdc);*/
+
+            DrawCube(hdc, Vector3(50.f, 50.f, 50.f), 200.f, 200.f, 200.f);
+
 
             EndPaint(hWnd, &ps);
         }

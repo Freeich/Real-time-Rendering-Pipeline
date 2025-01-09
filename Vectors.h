@@ -1,103 +1,27 @@
-#pragma once
+Ôªø#pragma once
 #include <cmath>
 #include <vector>
 #include <iostream>
 #include <string>
-class Vector3 {
-public:
-	float x;
-	float y;
-	float z;
-	Vector3():x(0.0), y(0.0), z(0.0) {}
-	Vector3(float x_in = 0.0, float y_in = 0.0, float z_in = 0.0) :x(x_in), y(y_in), z(z_in) {}
-	Vector3(const Vector3& v) :x(v.x), y(v.y), z(v.z) {};
-
-
-	// º”∑®
-	Vector3 operator+(const Vector3& vector_sec) {
-		return Vector3(x + vector_sec.x, y + vector_sec.y, z + vector_sec.z);
-	}
-	// ºı∑®
-	Vector3 operator-(const Vector3& vector_sec) {
-		return Vector3(x - vector_sec.x, y - vector_sec.y, z - vector_sec.z);
-	}
-
-	//  ˝≥À
-	Vector3 operator*(float k) {
-		return Vector3(k * x, k * y, k * z);
-	}
-
-	float length() {
-		return sqrt(x * x + y * y + z * z);
-	}
-
-	// µ„ª˝
-	float DotProduct(const Vector3& vector_sec) {
-		float result = x * vector_sec.x + y * vector_sec.y + z * vector_sec.z;
-		return result;
-	}
-	// ≤Êª˝
-	Vector3 CrossProduct(const Vector3& vector_sec) {
-		float x_normal = y * vector_sec.z - vector_sec.y * z;
-		float y_normal = z * vector_sec.x - x * vector_sec.z;
-		float z_normal = x * vector_sec.y - y * vector_sec.x;
-		return Vector3(x_normal, y_normal, z_normal);
-	}
-
-	// πÈ“ªªØ
-	Vector3 Normalize() {
-		float len = length();
-		if (len > 0) return Vector3(x / len, y / len, z / len);
-		else return Vector3(0, 0, 0);
-	}
-};
-
-class Vector2 {
-public:
-	float x;
-	float y;
-	Vector2() :x(0.0), y(0.0) {}
-	Vector2(float x_in = 0.0, float y_in = 0.0) :x(x_in), y(y_in) {}
-	Vector2(const Vector2& v) :x(v.x), y(v.y){};
-
-
-	// º”∑®
-	Vector2 operator+(const Vector3& vector_sec) {
-		return Vector2(x + vector_sec.x, y + vector_sec.y);
-	}
-	// ºı∑®
-	Vector2 operator-(const Vector3& vector_sec) {
-		return Vector2(x - vector_sec.x, y - vector_sec.y);
-	}
-
-	//  ˝≥À
-	Vector2 operator*(float k) {
-		return Vector2(k * x, k * y);
-	}
-
-	float length() {
-		return sqrt(x * x + y * y);
-	}
-};
 
 class Matrix {
 public:
 
-	// ∂˛Œ¨ ˝◊È
+	// ‰∫åÁª¥Êï∞ÁªÑ
 	std::vector<std::vector<float>> m;
-	// –– ¡–
+	// Ë°å Âàó
 	int rows;
 	int cols;
-	// ππ‘Ï∫Ø ˝
+	// ÊûÑÈÄ†ÂáΩÊï∞
 	Matrix() :m(std::vector<std::vector<float>>(4, std::vector<float>(4, 0.0f))), rows(4), cols(4) {}
-	Matrix(int r, int c):m(std::vector<std::vector<float>>(r, std::vector<float>(c, 0.0f))), rows(r), cols(c){}
+	Matrix(int r, int c) :m(std::vector<std::vector<float>>(r, std::vector<float>(c, 0.0f))), rows(r), cols(c) {}
 
 	float at(const int row, const int col) {
 		return m[row][col];
 	}
 
 
-	// º”∑®
+	// Âä†Ê≥ï
 	Matrix operator+(const Matrix& matrix_sec) {
 		//if (m.rows != rows or m.cols != cols);
 		Matrix matrix_new = Matrix();
@@ -110,7 +34,7 @@ public:
 		return matrix_new;
 	}
 
-	// ºı∑®
+	// ÂáèÊ≥ï
 	Matrix operator-(const Matrix& matrix_sec) {
 		//if (m.rows != rows or m.cols != cols);
 		Matrix matrix_new = Matrix();
@@ -124,14 +48,14 @@ public:
 	}
 
 
-	// ≥À∑®
+	// ‰πòÊ≥ï
 	Matrix operator*(const Matrix& matrix_sec) {
-		Matrix matrix_new = Matrix(rows, cols);
+		Matrix matrix_new = Matrix(rows, matrix_sec.cols);
 		for (size_t i = 0; i < rows; i++)
 		{
-			for (size_t j = 0; j < matrix_sec.cols; j++) 
+			for (size_t j = 0; j < matrix_sec.cols; j++)
 			{
-				for (size_t o = 0; o < cols; o++) 
+				for (size_t o = 0; o < cols; o++)
 				{
 					matrix_new.m[i][j] += m[i][o] * matrix_sec.m[o][j];
 				}
@@ -140,8 +64,8 @@ public:
 		return matrix_new;
 	}
 
-	// –˝◊™æÿ’ÛµƒƒÊ
-	// æÿ’Ûµƒ◊™÷√
+	// ÊóãËΩ¨Áü©ÈòµÁöÑÈÄÜ
+	// Áü©ÈòµÁöÑËΩ¨ÁΩÆ
 	Matrix transpose() {
 		Matrix matrix_tp(cols, rows);
 		for (size_t i = 0; i < rows; i++)
@@ -150,11 +74,12 @@ public:
 				matrix_tp.m[j][i] = m[i][j];
 			}
 		}
+		return matrix_tp;
 	}
 
-	//  ‰≥ˆæÿ’Û
+	// ËæìÂá∫Áü©Èòµ
 	void print(HDC hdc) {
-		
+
 		int u = 0;
 		for (size_t i = 0; i < rows; i++)
 		{
@@ -171,8 +96,105 @@ public:
 	}
 };
 
-// DDAª≠œﬂ
-void DrawLine(HDC hdc, Vector2 v1, Vector2 v2) {
+class Vector3 {
+public:
+	float x;
+	float y;
+	float z;
+	Vector3():x(0.0), y(0.0), z(0.0) {}
+	Vector3(float x_in = 0.0, float y_in = 0.0, float z_in = 0.0) :x(x_in), y(y_in), z(z_in) {}
+	Vector3(const Vector3& v) :x(v.x), y(v.y), z(v.z) {};
+
+
+	// Âä†Ê≥ï
+	Vector3 operator+(const Vector3& vector_sec) const {
+		return Vector3(x + vector_sec.x, y + vector_sec.y, z + vector_sec.z);
+	}
+	// ÂáèÊ≥ï
+	Vector3 operator-(const Vector3& vector_sec) {
+		return Vector3(x - vector_sec.x, y - vector_sec.y, z - vector_sec.z);
+	}
+
+	// Êï∞‰πò
+	Vector3 operator*(float k) {
+		return Vector3(k * x, k * y, k * z);
+	}
+
+	float length() {
+		return sqrt(x * x + y * y + z * z);
+	}
+
+	// ÁÇπÁßØ
+	float DotProduct(const Vector3& vector_sec) {
+		float result = x * vector_sec.x + y * vector_sec.y + z * vector_sec.z;
+		return result;
+	}
+	// ÂèâÁßØ
+	Vector3 CrossProduct(const Vector3& vector_sec) const {
+		float x_normal = y * vector_sec.z - vector_sec.y * z;
+		float y_normal = z * vector_sec.x - x * vector_sec.z;
+		float z_normal = x * vector_sec.y - y * vector_sec.x;
+		return Vector3(x_normal, y_normal, z_normal);
+	}
+
+	// ÂΩí‰∏ÄÂåñ
+	Vector3 Normalize() {
+		float len = length();
+		if (len > 0) return Vector3(x / len, y / len, z / len);
+		else return Vector3(0, 0, 0);
+	}
+
+	// ËΩ¨Âåñ‰∏∫Áü©Èòµ
+	Matrix PointToMatrix() {
+		Matrix vm(4, 1);
+		vm.m[0][0] = x;
+		vm.m[1][0] = y;
+		vm.m[2][0] = z;
+		vm.m[3][0] = 1.f;
+		return vm;
+	}
+
+	Matrix VectorToMatrix() {
+		Matrix vm(4, 1);
+		vm.m[0][0] = x;
+		vm.m[1][0] = y;
+		vm.m[2][0] = z;
+		vm.m[3][0] = 0.f;
+		return vm;
+	}
+};
+
+class Vector2 {
+public:
+	float x;
+	float y;
+	Vector2() :x(0.0), y(0.0) {}
+	Vector2(float x_in = 0.0, float y_in = 0.0) :x(x_in), y(y_in) {}
+	Vector2(const Vector2& v) :x(v.x), y(v.y){};
+
+
+	// Âä†Ê≥ï
+	Vector2 operator+(const Vector3& vector_sec) {
+		return Vector2(x + vector_sec.x, y + vector_sec.y);
+	}
+	// ÂáèÊ≥ï
+	Vector2 operator-(const Vector3& vector_sec) {
+		return Vector2(x - vector_sec.x, y - vector_sec.y);
+	}
+
+	// Êï∞‰πò
+	Vector2 operator*(float k) {
+		return Vector2(k * x, k * y);
+	}
+
+	float length() {
+		return sqrt(x * x + y * y);
+	}
+};
+
+
+// DDAÁîªÁ∫ø
+void DrawLine(HDC hdc, const Vector2& v1, const Vector2& v2) {
 	int x_len = v2.x - v1.x;
 	int y_len = v2.y - v1.y;
 	int step = max(abs(x_len), abs(y_len));
@@ -186,8 +208,156 @@ void DrawLine(HDC hdc, Vector2 v1, Vector2 v2) {
 		x = x + x_inc;
 		y = y + y_inc;
 	}
+	// 
 	Ellipse(hdc, v1.x - 3, v1.y + 3, v1.x + 3, v1.y - 3);
 	Ellipse(hdc, v2.x - 3, v2.y + 3, v2.x + 3, v2.y - 3);
 }
 
-// ª≠¡¢∑ΩÃÂœﬂøÚ
+void DrawLine(HDC hdc, const Vector3& v1, const Vector3& v2) {
+	int x_len = v2.x - v1.x;
+	int y_len = v2.y - v1.y;
+	int step = max(abs(x_len), abs(y_len));
+	if (step == 0) return;
+	float x_inc = x_len / (float)step;
+	float y_inc = y_len / (float)step;
+	float x = v1.x;
+	float y = v1.y;
+	for (size_t i = 0; i <= step; i++)
+	{
+		SetPixelV(hdc, round(x), round(y), RGB(255, 0, 0));
+		x = x + x_inc;
+		y = y + y_inc;
+	}
+	// 
+	Ellipse(hdc, v1.x - 3, v1.y + 3, v1.x + 3, v1.y - 3);
+	Ellipse(hdc, v2.x - 3, v2.y + 3, v2.x + 3, v2.y - 3);
+}
+
+
+// MVPÁÆóÊ≥ï
+Vector3 MVP(Vector3 point, const Vector3& e = Vector3(0.f, 0.f, 0.f), Vector3 g = Vector3(0.f, 0.f, 1.f), const Vector3& t = Vector3(0.f, 1.f, 0.f)) {
+	
+	// VectorËΩ¨Êç¢‰∏∫MatrixÊñπ‰æøËÆ°ÁÆó
+	Matrix point_matrix = point.PointToMatrix();
+
+	// ÂèñlookatÊñπÂêë
+	g = g - e;
+
+	// ËßÜËßíÂèòÊç¢
+	Matrix translate(4, 4);
+	translate.m[0][0] = 1.f;
+	translate.m[1][1] = 1.f;
+	translate.m[2][2] = 1.f;
+	translate.m[3][3] = 1.f;
+	translate.m[3][0] = -e.x;
+	translate.m[3][1] = -e.y;
+	translate.m[3][2] = -e.z;
+
+	Vector3 r = g.CrossProduct(t);
+
+	// ÊóãËΩ¨Áü©ÈòµÁöÑÈÄÜÁü©Èòµ
+	Matrix rotate_inverse(4, 4);
+	rotate_inverse.m[0][0] = r.x;
+	rotate_inverse.m[1][0] = r.y;
+	rotate_inverse.m[2][0] = r.z;
+	rotate_inverse.m[0][1] = t.x;
+	rotate_inverse.m[1][1] = t.y;
+	rotate_inverse.m[2][1] = t.z;
+	rotate_inverse.m[0][2] = -g.x;
+	rotate_inverse.m[1][2] = -g.y;
+	rotate_inverse.m[2][2] = -g.z;
+	rotate_inverse.m[3][3] = 1.f;
+
+	// ÊóãËΩ¨Áü©Èòµ
+	Matrix rotate = rotate_inverse.transpose();
+
+	point_matrix = translate * point_matrix;
+	point_matrix = rotate * point_matrix;
+	
+	// ÈÄèËßÜÁü©Èòµ
+	float fov = 90.f;
+	float aspect = 16.f / 9.f;
+	float z_near = -0.3f;
+	float z_far = 500.f;
+
+	Matrix pers_proj(4, 4);
+	/*pers_proj.m[0][0] = 1.f / (aspect * tan(fov / 2.f));
+	pers_proj.m[1][1] = 1.f / tan(fov / 2.f);
+	pers_proj.m[2][2] = -1 * (z_near + z_far) / (z_near - z_far);
+	pers_proj.m[2][3] = (2 * z_near * z_far) / (z_near - z_far);
+	pers_proj.m[3][2] = -1.f;*/
+
+	pers_proj.m[0][0] = z_near / 2.f;
+	pers_proj.m[1][1] = z_near / 2.f;
+	pers_proj.m[2][2] = (z_near + z_far) / (z_far - z_near);
+	pers_proj.m[2][3] = -1 * (2 * z_near * z_far) / z_far - z_near;
+	pers_proj.m[3][2] = 1.f;
+
+	point_matrix = pers_proj * point_matrix;
+
+	// Ë£ÅÂâ™
+	if (point_matrix.m[3][0] != 0.f) {
+		point_matrix.m[0][0] = point_matrix.m[0][0] / point_matrix.m[3][0];
+		point_matrix.m[1][0] = point_matrix.m[1][0] / point_matrix.m[3][0];
+		point_matrix.m[2][0] = point_matrix.m[2][0] / point_matrix.m[3][0];
+		point_matrix.m[3][0] = point_matrix.m[3][0] / point_matrix.m[3][0];
+	}
+
+	// ËßÜÂè£ÂèòÊç¢
+	float width = 1600.f;
+	float height = 900.f;
+	Matrix viewport_matrix(4, 4);
+	viewport_matrix.m[0][0] = width / 2;
+	viewport_matrix.m[0][3] = width / 2;
+	viewport_matrix.m[1][1] = height / 2;
+	viewport_matrix.m[1][3] = height / 2;
+	viewport_matrix.m[2][2] = 1.f;
+	viewport_matrix.m[3][3] = 1.f;
+
+	point_matrix = viewport_matrix * point_matrix;
+	return Vector3(point_matrix.m[0][0], point_matrix.m[1][0], point_matrix.m[2][0]);
+}
+
+// ÁîªÁ´ãÊñπ‰ΩìÁ∫øÊ°Ü
+void DrawCube(HDC hdc, const Vector3& start, float length, float width, float height) {
+	Vector3 bottom_1 = start;
+	Vector3 bottom_2(bottom_1.x + length, bottom_1.y, bottom_1.z);
+	Vector3 bottom_3(bottom_1.x + length, bottom_1.y, bottom_1.z + width);
+	Vector3 bottom_4(bottom_1.x, bottom_1.y, bottom_1.z + width);
+	Vector3 top_1(bottom_1.x, bottom_1.y + height, bottom_1.z);
+	Vector3 top_2(bottom_2.x, bottom_2.y + height, bottom_2.z);
+	Vector3 top_3(bottom_3.x, bottom_3.y + height, bottom_3.z);
+	Vector3 top_4(bottom_4.x, bottom_4.y + height, bottom_4.z);
+
+	bottom_1 = MVP(bottom_1);
+	bottom_2 = MVP(bottom_2);
+	bottom_3 = MVP(bottom_3);
+	bottom_4 = MVP(bottom_4);
+	top_1 = MVP(top_1);
+	top_2 = MVP(top_2);
+	top_3 = MVP(top_3);
+	top_4 = MVP(top_4);
+
+	DrawLine(hdc, bottom_1, bottom_2);
+	DrawLine(hdc, bottom_2, bottom_3);
+	DrawLine(hdc, bottom_3, bottom_4);
+	DrawLine(hdc, bottom_4, bottom_1);
+	DrawLine(hdc, top_1, top_2);
+	DrawLine(hdc, top_2, top_3);
+	DrawLine(hdc, top_3, top_4);
+	DrawLine(hdc, top_4, top_1);
+	DrawLine(hdc, top_1, bottom_1);
+	DrawLine(hdc, top_2, bottom_2);
+	DrawLine(hdc, top_3, bottom_3);
+	DrawLine(hdc, top_4, bottom_4);
+
+	TextOut(hdc, bottom_1.x, bottom_1.y, TEXT("1"), 1);
+	TextOut(hdc, bottom_2.x, bottom_2.y, TEXT("2"), 1);
+	TextOut(hdc, bottom_3.x, bottom_3.y, TEXT("3"), 1);
+	TextOut(hdc, bottom_4.x, bottom_4.y, TEXT("4"), 1);
+	TextOut(hdc, top_1.x, top_1.y, TEXT("a"), 1);
+	TextOut(hdc, top_2.x, top_2.y, TEXT("b"), 1);
+	TextOut(hdc, top_3.x, top_3.y, TEXT("c"), 1);
+	TextOut(hdc, top_4.x, top_4.y, TEXT("d"), 1);
+
+}
