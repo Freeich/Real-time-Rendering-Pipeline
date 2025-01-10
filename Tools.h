@@ -439,3 +439,6 @@ void DrawCube(HDC hdc, const Camera& camera, const Vector3& start, float length,
 }
 
 
+void tick() {}
+
+void render() {}

@@ -5,7 +5,7 @@
 #include "WindowDemo.h"
 #include <iostream>
 #include <cmath>
-#include "Vectors.h"
+#include "Tools.h"
 #include <windowsx.h>
 
 
@@ -53,16 +53,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     // 主消息循环: peekmessage
     while (running) {
-        while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+        if(PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
         {
-            if (msg.message == WM_QUIT) running = false;
+            //if (msg.message == WM_QUIT) running = false;
             if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
             {
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
             }
         }
-
 
         HDC hdc = GetDC(msg.hwnd);
 
@@ -71,15 +70,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         GetClientRect(msg.hwnd, &rect);
         FillRect(hdc, &rect, (HBRUSH)(COLOR_WINDOW + 1));
 
-        /*camera.location_.x += 0.1f;
-        camera.location_.y += 0.1f;
-        camera.lookat_ = Vector3(1.f, 0.f, -1.0f);*/
-        //camera.roll_ += 0.1f;
         DrawCube(hdc, camera, Vector3(100.f, 100.f, -100.f), 200.f, 200.f, 200.f);
+        ReleaseDC(msg.hwnd, hdc);
     }
-    
 
     return (int) msg.wParam;
+
 }
 
 
@@ -149,6 +145,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    float translate_step = 10.f;
+    float roate_step = 1.f;
     switch (message)
     {
     case WM_COMMAND:
@@ -180,37 +178,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         break;
     case WM_CHAR:
-    {
+    {   
         switch (wParam)
         {
             case 'a':
-
-                camera.location_.x -= 1.f;
-
+                camera.location_.x -= translate_step;
                 break;
 
             case 'd':
-
-                camera.location_.x += 1.f;
-
+                camera.location_.x += translate_step;
                 break;
 
             case 'w':
-
-                camera.location_.y += 1.f;
-
+                camera.location_.y += translate_step;
                 break;
 
             case 's':
-
-                camera.location_.y -= 1.f;
-
+                camera.location_.y -= translate_step;
                 break;
 
             default:
-
-                // Process displayable characters. 
-
                 break;
         }
         break;
@@ -220,30 +207,23 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         switch (wParam)
         {
             case VK_LEFT:
-
-                camera.pitch_ -= 1.f;
-
+                camera.pitch_ -= roate_step;
                 break;
 
             case VK_RIGHT:
-
-                camera.pitch_ += 1.f;
-
+                camera.pitch_ += roate_step;
                 break;
 
             case VK_UP:
-
-                camera.roll_ -= 1.f;
-
+                camera.roll_ -= roate_step;
                 break;
 
             case VK_DOWN:
-
-                camera.roll_ += 1.f;
-
+                camera.roll_ += roate_step;
                 break;
-        default:
-            break;
+
+            default:
+                break;
         }
 
 
