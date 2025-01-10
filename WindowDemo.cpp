@@ -3,8 +3,10 @@
 
 #include "framework.h"
 #include "WindowDemo.h"
+#include <iostream>
 #include <cmath>
 #include "Vectors.h"
+#include <windowsx.h>
 
 
 #define MAX_LOADSTRING 100
@@ -14,11 +16,14 @@ HINSTANCE hInst;                                // 当前实例
 WCHAR szTitle[MAX_LOADSTRING];                  // 标题栏文本
 WCHAR szWindowClass[MAX_LOADSTRING];            // 主窗口类名
 
+Camera camera = Camera(); // 创建全局相机
+
 // 此代码模块中包含的函数的前向声明:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -44,21 +49,37 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_WINDOWDEMO));
 
     MSG msg;
+    bool running = true;
 
     // 主消息循环: peekmessage
-    while (GetMessage(&msg, nullptr, 0, 0))
-    {
-        if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+    while (running) {
+        while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
         {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            if (msg.message == WM_QUIT) running = false;
+            if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+            {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            }
         }
+
+
+        HDC hdc = GetDC(msg.hwnd);
+
+        // 每次画完重新填充为白色
+        RECT rect;
+        GetClientRect(msg.hwnd, &rect);
+        FillRect(hdc, &rect, (HBRUSH)(COLOR_WINDOW + 1));
+
+        /*camera.location_.x += 0.1f;
+        camera.location_.y += 0.1f;
+        camera.lookat_ = Vector3(1.f, 0.f, -1.0f);*/
+        //camera.roll_ += 0.1f;
+        DrawCube(hdc, camera, Vector3(100.f, 100.f, -100.f), 200.f, 200.f, 200.f);
     }
+    
 
     return (int) msg.wParam;
-
-
-    
 }
 
 
@@ -147,6 +168,85 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
         }
         break;
+    case WM_MOUSEMOVE:
+        {
+            float x = 0.f;
+            float y = 0.f;
+
+            x = GET_X_LPARAM(lParam);
+            y = GET_Y_LPARAM(lParam);
+            camera.pitch_ = x;
+            camera.roll_ = y;
+        }
+        break;
+    case WM_CHAR:
+    {
+        switch (wParam)
+        {
+            case 'a':
+
+                camera.location_.x -= 1.f;
+
+                break;
+
+            case 'd':
+
+                camera.location_.x += 1.f;
+
+                break;
+
+            case 'w':
+
+                camera.location_.y += 1.f;
+
+                break;
+
+            case 's':
+
+                camera.location_.y -= 1.f;
+
+                break;
+
+            default:
+
+                // Process displayable characters. 
+
+                break;
+        }
+        break;
+    }
+
+    case WM_KEYDOWN:
+        switch (wParam)
+        {
+            case VK_LEFT:
+
+                camera.pitch_ -= 1.f;
+
+                break;
+
+            case VK_RIGHT:
+
+                camera.pitch_ += 1.f;
+
+                break;
+
+            case VK_UP:
+
+                camera.roll_ -= 1.f;
+
+                break;
+
+            case VK_DOWN:
+
+                camera.roll_ += 1.f;
+
+                break;
+        default:
+            break;
+        }
+
+
     case WM_PAINT:
         {
             PAINTSTRUCT ps;
@@ -173,7 +273,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             mm2.print(hdc);*/
 
-            DrawCube(hdc, Vector3(100.f, 100.f, -100.f), 100.f, 100.f, 100.f);
+            //DrawCube(hdc, Vector3(100.f, 100.f, -100.f), 100.f, 100.f, 100.f);
 
 
             EndPaint(hWnd, &ps);

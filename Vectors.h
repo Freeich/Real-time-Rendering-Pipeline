@@ -4,6 +4,8 @@
 #include <iostream>
 #include <string>
 
+const float PI = 3.14159265358979323846;
+
 class Matrix {
 public:
 
@@ -101,8 +103,8 @@ public:
 	float x;
 	float y;
 	float z;
-	Vector3():x(0.0), y(0.0), z(0.0) {}
-	Vector3(float x_in = 0.0, float y_in = 0.0, float z_in = 0.0) :x(x_in), y(y_in), z(z_in) {}
+	//Vector3():x(0.0f), y(0.0f), z(0.0f) {}
+	Vector3(float x_in = 0.0f, float y_in = 0.0f, float z_in = 0.0f) :x(x_in), y(y_in), z(z_in) {}
 	Vector3(const Vector3& v) :x(v.x), y(v.y), z(v.z) {};
 
 
@@ -233,15 +235,89 @@ void DrawLine(HDC hdc, const Vector3& v1, const Vector3& v2) {
 	Ellipse(hdc, v2.x - 3, v2.y + 3, v2.x + 3, v2.y - 3);
 }
 
+// 摄像机类
+class Camera {
+public:
+	Vector3 location_;
+	Vector3 lookat_;
+	Vector3 top_;
+	float pitch_;
+	float yaw_;
+	float roll_;
+
+	Camera() : 
+		location_(Vector3(0.f, 0.f, 0.f)), 
+		lookat_(Vector3(0.f, 0.f, -1.f)), 
+		top_(Vector3(0.f, 1.f, 0.f)),
+		pitch_(0.0f),
+		yaw_(0.0f),
+		roll_(0.0f){};
+
+	Camera(const Vector3& location, const Vector3& lookat = Vector3(0.f, 0.f, -1.f), const Vector3& top = Vector3(0.f, 1.f, 0.f)) :
+		location_(location), 
+		lookat_(lookat), 
+		top_(top),
+		pitch_(0.0f),
+		yaw_(0.0f),
+		roll_(0.0f) {};
+
+	Vector3 GetLocation() { return location_; };
+	Vector3 GetTop() { return top_; };
+
+	Vector3 GetLookat() { 
+		Matrix pitch_rotate = Matrix();
+		Matrix yaw_rotate = Matrix();
+		Matrix roll_rotate = Matrix();
+
+		float pitch = pitch_ * PI / 180.f;
+		float yaw = yaw_ * PI / 180.f;
+		float roll = roll_ * PI / 180.f;
+
+
+		pitch_rotate.m[0][0] = cos(pitch);
+		pitch_rotate.m[0][2] = sin(pitch);
+		pitch_rotate.m[1][1] = 1.f;
+		pitch_rotate.m[2][0] = -sin(pitch);
+		pitch_rotate.m[2][2] = cos(pitch);
+		pitch_rotate.m[3][3] = 1.f;
+
+		yaw_rotate.m[0][0] = cos(yaw);
+		yaw_rotate.m[0][1] = -sin(yaw);
+		yaw_rotate.m[1][0] = sin(yaw);
+		yaw_rotate.m[1][1] = cos(yaw);
+		yaw_rotate.m[2][2] = 1.f;
+		yaw_rotate.m[3][3] = 1.f;
+
+		roll_rotate.m[0][0] = 1.f;
+		roll_rotate.m[1][1] = cos(roll);
+		roll_rotate.m[1][2] = -sin(roll);
+		roll_rotate.m[2][1] = sin(roll);
+		roll_rotate.m[2][2] = cos(roll);
+		roll_rotate.m[3][3] = 1.f;
+		
+		Matrix lookat_m = lookat_.VectorToMatrix();
+		Matrix lookat_matrix = pitch_rotate * yaw_rotate * roll_rotate * lookat_m;
+
+		lookat_.x = lookat_matrix.m[0][0];
+		lookat_.y = lookat_matrix.m[1][0];
+		lookat_.z = lookat_matrix.m[2][0];
+		
+		return lookat_;
+	};
+};
 
 // MVP算法
-Vector3 MVP(Vector3 point, const Vector3& e = Vector3(50.f, 50.f, 0.f), Vector3 g = Vector3(1.f, 1.f, -1.f), Vector3 t = Vector3(0.f, 1.f, 0.f)) {
+Vector3 MVP(Vector3& point, Camera camera) {
 	
 	// Vector转换为Matrix方便计算
 	Matrix point_matrix = point.PointToMatrix();
 
-	// 取lookat方向
-	//g = g - e;
+	Vector3 e = camera.GetLocation();
+	Vector3 g = camera.GetLookat();
+	Vector3 top = camera.GetTop();
+
+	//g = (g - e).Normalize();
+	g = g.Normalize();
 
 	// 视角变换
 	Matrix translate(4, 4);
@@ -253,8 +329,10 @@ Vector3 MVP(Vector3 point, const Vector3& e = Vector3(50.f, 50.f, 0.f), Vector3 
 	translate.m[1][3] = -e.y;
 	translate.m[2][3] = -e.z;
 
-	Vector3 r = g.CrossProduct(t);
-	t = r.CrossProduct(g);
+	Vector3 r = g.CrossProduct(top);
+
+	// 矫正相机top向量
+	Vector3 t = r.CrossProduct(g);
 
 	// 旋转矩阵的逆矩阵
 	Matrix rotate_inverse(4, 4);
@@ -275,18 +353,13 @@ Vector3 MVP(Vector3 point, const Vector3& e = Vector3(50.f, 50.f, 0.f), Vector3 
 	point_matrix = translate * point_matrix;
 	point_matrix = rotate * point_matrix;
 	
-	// 透视矩阵 -----------------------------------------------------(待改)
+	// 透视矩阵
 	float fov = 90.f;
 	float aspect = 16.f / 9.f;
 	float z_near = - 0.3f;
 	float z_far = - 500.f;
 
 	Matrix pers_proj(4, 4);
-	/*pers_proj.m[0][0] = 1.f / (aspect * tan(fov / 2.f));
-	pers_proj.m[1][1] = 1.f / tan(fov / 2.f);
-	pers_proj.m[2][2] = -1 * (z_near + z_far) / (z_near - z_far);
-	pers_proj.m[2][3] = (2 * z_near * z_far) / (z_near - z_far);
-	pers_proj.m[3][2] = -1.f;*/
 
 	pers_proj.m[0][0] = z_near / 1.f;
 	pers_proj.m[1][1] = z_near / 1.f;
@@ -295,25 +368,6 @@ Vector3 MVP(Vector3 point, const Vector3& e = Vector3(50.f, 50.f, 0.f), Vector3 
 	pers_proj.m[3][2] = 1.f;
 
 	point_matrix = pers_proj * point_matrix;
-
-
-
-
-	// 正交投影
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 	// 裁剪
 	if (point_matrix.m[3][0] != 0.f) {
@@ -338,8 +392,10 @@ Vector3 MVP(Vector3 point, const Vector3& e = Vector3(50.f, 50.f, 0.f), Vector3 
 	return Vector3(point_matrix.m[0][0], point_matrix.m[1][0], point_matrix.m[2][0]);
 }
 
+
+
 // 画立方体线框
-void DrawCube(HDC hdc, const Vector3& start, float length, float width, float height) {
+void DrawCube(HDC hdc, const Camera& camera, const Vector3& start, float length, float width, float height) {
 	Vector3 bottom_1 = start;
 	Vector3 bottom_2(bottom_1.x + length, bottom_1.y, bottom_1.z);
 	Vector3 bottom_3(bottom_1.x + length, bottom_1.y, bottom_1.z - width);
@@ -349,14 +405,14 @@ void DrawCube(HDC hdc, const Vector3& start, float length, float width, float he
 	Vector3 top_3(bottom_3.x, bottom_3.y + height, bottom_3.z);
 	Vector3 top_4(bottom_4.x, bottom_4.y + height, bottom_4.z);
 
-	bottom_1 = MVP(bottom_1);
-	bottom_2 = MVP(bottom_2);
-	bottom_3 = MVP(bottom_3);
-	bottom_4 = MVP(bottom_4);
-	top_1 = MVP(top_1);
-	top_2 = MVP(top_2);
-	top_3 = MVP(top_3);
-	top_4 = MVP(top_4);
+	bottom_1 = MVP(bottom_1, camera);
+	bottom_2 = MVP(bottom_2, camera);
+	bottom_3 = MVP(bottom_3, camera);
+	bottom_4 = MVP(bottom_4, camera);
+	top_1 = MVP(top_1, camera);
+	top_2 = MVP(top_2, camera);
+	top_3 = MVP(top_3, camera);
+	top_4 = MVP(top_4, camera);
 
 	DrawLine(hdc, bottom_1, bottom_2);
 	DrawLine(hdc, bottom_2, bottom_3);
@@ -381,3 +437,5 @@ void DrawCube(HDC hdc, const Vector3& start, float length, float width, float he
 	TextOut(hdc, top_4.x, top_4.y, TEXT("d"), 1);
 
 }
+
+
