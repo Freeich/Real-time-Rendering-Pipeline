@@ -329,10 +329,10 @@ Vector3 MVP(Vector3& point, Camera camera) {
 	translate.m[1][3] = -e.y;
 	translate.m[2][3] = -e.z;
 
-	Vector3 r = g.CrossProduct(top);
+	Vector3 r = g.CrossProduct(top).Normalize();
 
 	// 矫正相机top向量
-	Vector3 t = r.CrossProduct(g);
+	Vector3 t = r.CrossProduct(g).Normalize();
 
 	// 旋转矩阵的逆矩阵
 	Matrix rotate_inverse(4, 4);
@@ -441,4 +441,7 @@ void DrawCube(HDC hdc, const Camera& camera, const Vector3& start, float length,
 
 void tick() {}
 
-void render() {}
+void render() {
+	// 上色，扫描线算法
+
+}

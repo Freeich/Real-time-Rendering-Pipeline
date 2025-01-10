@@ -146,7 +146,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     float translate_step = 10.f;
-    float roate_step = 1.f;
+    float roate_step = 3.f;
     switch (message)
     {
     case WM_COMMAND:
