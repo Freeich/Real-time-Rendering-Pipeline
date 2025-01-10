@@ -235,13 +235,13 @@ void DrawLine(HDC hdc, const Vector3& v1, const Vector3& v2) {
 
 
 // MVP算法
-Vector3 MVP(Vector3 point, const Vector3& e = Vector3(0.f, 0.f, 0.f), Vector3 g = Vector3(0.f, 0.f, 1.f), const Vector3& t = Vector3(0.f, 1.f, 0.f)) {
+Vector3 MVP(Vector3 point, const Vector3& e = Vector3(50.f, 50.f, 0.f), Vector3 g = Vector3(1.f, 1.f, -1.f), Vector3 t = Vector3(0.f, 1.f, 0.f)) {
 	
 	// Vector转换为Matrix方便计算
 	Matrix point_matrix = point.PointToMatrix();
 
 	// 取lookat方向
-	g = g - e;
+	//g = g - e;
 
 	// 视角变换
 	Matrix translate(4, 4);
@@ -249,11 +249,12 @@ Vector3 MVP(Vector3 point, const Vector3& e = Vector3(0.f, 0.f, 0.f), Vector3 g 
 	translate.m[1][1] = 1.f;
 	translate.m[2][2] = 1.f;
 	translate.m[3][3] = 1.f;
-	translate.m[3][0] = -e.x;
-	translate.m[3][1] = -e.y;
-	translate.m[3][2] = -e.z;
+	translate.m[0][3] = -e.x;
+	translate.m[1][3] = -e.y;
+	translate.m[2][3] = -e.z;
 
 	Vector3 r = g.CrossProduct(t);
+	t = r.CrossProduct(g);
 
 	// 旋转矩阵的逆矩阵
 	Matrix rotate_inverse(4, 4);
@@ -274,11 +275,11 @@ Vector3 MVP(Vector3 point, const Vector3& e = Vector3(0.f, 0.f, 0.f), Vector3 g 
 	point_matrix = translate * point_matrix;
 	point_matrix = rotate * point_matrix;
 	
-	// 透视矩阵
+	// 透视矩阵 -----------------------------------------------------(待改)
 	float fov = 90.f;
 	float aspect = 16.f / 9.f;
-	float z_near = -0.3f;
-	float z_far = 500.f;
+	float z_near = - 0.3f;
+	float z_far = - 500.f;
 
 	Matrix pers_proj(4, 4);
 	/*pers_proj.m[0][0] = 1.f / (aspect * tan(fov / 2.f));
@@ -287,13 +288,32 @@ Vector3 MVP(Vector3 point, const Vector3& e = Vector3(0.f, 0.f, 0.f), Vector3 g 
 	pers_proj.m[2][3] = (2 * z_near * z_far) / (z_near - z_far);
 	pers_proj.m[3][2] = -1.f;*/
 
-	pers_proj.m[0][0] = z_near / 2.f;
-	pers_proj.m[1][1] = z_near / 2.f;
+	pers_proj.m[0][0] = z_near / 1.f;
+	pers_proj.m[1][1] = z_near / 1.f;
 	pers_proj.m[2][2] = (z_near + z_far) / (z_far - z_near);
-	pers_proj.m[2][3] = -1 * (2 * z_near * z_far) / z_far - z_near;
+	pers_proj.m[2][3] = -1 * (2 * z_near * z_far) / (z_far - z_near);
 	pers_proj.m[3][2] = 1.f;
 
 	point_matrix = pers_proj * point_matrix;
+
+
+
+
+	// 正交投影
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 	// 裁剪
 	if (point_matrix.m[3][0] != 0.f) {
@@ -322,8 +342,8 @@ Vector3 MVP(Vector3 point, const Vector3& e = Vector3(0.f, 0.f, 0.f), Vector3 g 
 void DrawCube(HDC hdc, const Vector3& start, float length, float width, float height) {
 	Vector3 bottom_1 = start;
 	Vector3 bottom_2(bottom_1.x + length, bottom_1.y, bottom_1.z);
-	Vector3 bottom_3(bottom_1.x + length, bottom_1.y, bottom_1.z + width);
-	Vector3 bottom_4(bottom_1.x, bottom_1.y, bottom_1.z + width);
+	Vector3 bottom_3(bottom_1.x + length, bottom_1.y, bottom_1.z - width);
+	Vector3 bottom_4(bottom_1.x, bottom_1.y, bottom_1.z - width);
 	Vector3 top_1(bottom_1.x, bottom_1.y + height, bottom_1.z);
 	Vector3 top_2(bottom_2.x, bottom_2.y + height, bottom_2.z);
 	Vector3 top_3(bottom_3.x, bottom_3.y + height, bottom_3.z);

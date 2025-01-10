@@ -45,7 +45,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     MSG msg;
 
-    // 主消息循环:
+    // 主消息循环: peekmessage
     while (GetMessage(&msg, nullptr, 0, 0))
     {
         if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
@@ -56,8 +56,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     }
 
     return (int) msg.wParam;
-}
 
+
+    
+}
 
 
 //
@@ -171,7 +173,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             mm2.print(hdc);*/
 
-            DrawCube(hdc, Vector3(50.f, 50.f, 50.f), 200.f, 200.f, 200.f);
+            DrawCube(hdc, Vector3(100.f, 100.f, -100.f), 100.f, 100.f, 100.f);
 
 
             EndPaint(hWnd, &ps);
