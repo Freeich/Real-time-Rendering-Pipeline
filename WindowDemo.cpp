@@ -50,7 +50,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     MSG msg;
     bool running = true;
-
     // 主消息循环: peekmessage
     while (running) {
         if(PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
@@ -70,8 +69,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         GetClientRect(msg.hwnd, &rect);
         FillRect(hdc, &rect, (HBRUSH)(COLOR_WINDOW + 1));
 
+        // 画外边框(待删)
         DrawCube(hdc, camera, Vector3(100.f, 100.f, -100.f), 200.f, 200.f, 200.f);
+        
         ReleaseDC(msg.hwnd, hdc);
+        //Sleep(200);
     }
 
     return (int) msg.wParam;
@@ -166,7 +168,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
         }
         break;
-    case WM_MOUSEMOVE:
+    /*case WM_MOUSEMOVE:
         {
             float x = 0.f;
             float y = 0.f;
@@ -176,7 +178,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             camera.pitch_ = x;
             camera.roll_ = y;
         }
-        break;
+        break;*/
     case WM_CHAR:
     {   
         switch (wParam)
@@ -215,11 +217,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 break;
 
             case VK_UP:
-                camera.roll_ -= roate_step;
+                camera.roll_ = Clamp(camera.roll_ - roate_step, -90.f, 90.f);
                 break;
 
             case VK_DOWN:
-                camera.roll_ += roate_step;
+                camera.roll_ = Clamp(camera.roll_ + roate_step, -90.f, 90.f);
                 break;
 
             default:
