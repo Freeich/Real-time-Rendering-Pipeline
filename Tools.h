@@ -609,13 +609,7 @@ void DrawTriangle(ColoredVertex p1, ColoredVertex p2, ColoredVertex p3, float* z
 
 
 // 传递三角信息
-void Render(HDC& hdc, const std::vector<Triangle>& triangles) {
-
-	// Z-Buffer
-	float* z_buffer = (float*)calloc(width * height, sizeof(float));
-
-	// BackBuffer
-	uint32_t* backbuffer = new uint32_t[width * height];
+void Render(HDC& hdc, const std::vector<Triangle>& triangles, uint32_t* backbuffer, float* z_buffer) {
 
 	// 给每个三角形进行线性插值上色
 	for (Triangle t : triangles) {
@@ -635,16 +629,11 @@ void Render(HDC& hdc, const std::vector<Triangle>& triangles) {
 		0, 0, width, height,        // 从源区域读取
 		backbuffer, &bmi,          // 像素数据和位图信息
 		DIB_RGB_COLORS, SRCCOPY);
-	
-
-	// 释放堆内存
-	free(z_buffer);
-	delete backbuffer;
 }
 
 
 // 画立方体线框
-void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length, float width, float height) {
+void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length, float width, float height, uint32_t* backbuffer, float* z_buffer) {
 	Vector3 bottom_1 = start;
 	Vector3 bottom_2(bottom_1.x + length, bottom_1.y, bottom_1.z);
 	Vector3 bottom_3(bottom_1.x + length, bottom_1.y, bottom_1.z - width);
@@ -688,6 +677,7 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 		{5, 8, 7} };
 
 
+	// 画边框
 	//DrawLine(hdc, bottom_1, bottom_2);
 	//DrawLine(hdc, bottom_2, bottom_3);
 	//DrawLine(hdc, bottom_3, bottom_4);
@@ -701,14 +691,15 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 	//DrawLine(hdc, top_3, bottom_3);
 	//DrawLine(hdc, top_4, bottom_4);
 
-	TextOut(hdc, bottom_1.x, bottom_1.y, TEXT("1"), 1);
-	TextOut(hdc, bottom_2.x, bottom_2.y, TEXT("2"), 1);
-	TextOut(hdc, bottom_3.x, bottom_3.y, TEXT("3"), 1);
-	TextOut(hdc, bottom_4.x, bottom_4.y, TEXT("4"), 1);
-	TextOut(hdc, top_1.x, top_1.y, TEXT("a"), 1);
-	TextOut(hdc, top_2.x, top_2.y, TEXT("b"), 1);
-	TextOut(hdc, top_3.x, top_3.y, TEXT("c"), 1);
-	TextOut(hdc, top_4.x, top_4.y, TEXT("d"), 1);
+	// 标记顶点
+	//TextOut(hdc, bottom_1.x, bottom_1.y, TEXT("1"), 1);
+	//TextOut(hdc, bottom_2.x, bottom_2.y, TEXT("2"), 1);
+	//TextOut(hdc, bottom_3.x, bottom_3.y, TEXT("3"), 1);
+	//TextOut(hdc, bottom_4.x, bottom_4.y, TEXT("4"), 1);
+	//TextOut(hdc, top_1.x, top_1.y, TEXT("a"), 1);
+	//TextOut(hdc, top_2.x, top_2.y, TEXT("b"), 1);
+	//TextOut(hdc, top_3.x, top_3.y, TEXT("c"), 1);
+	//TextOut(hdc, top_4.x, top_4.y, TEXT("d"), 1);
 	
 	std::vector<Triangle> ts = std::vector<Triangle>();
 
@@ -719,7 +710,7 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 	}
 	
 	// 渲染操作
-	Render(hdc, ts);
+	Render(hdc, ts, backbuffer, z_buffer);
 }
 
 void tick() {}

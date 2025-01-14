@@ -52,6 +52,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     MSG msg;
     bool running = true;
+    
+    // Z-Buffer
+    float* z_buffer = (float*)calloc(width * height, sizeof(float));
+
+    // SwapBuffer
+    uint32_t* backbuffer = new uint32_t[width * height];
+
     // 主消息循环: peekmessage
     while (running) {
         if(PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
@@ -66,6 +73,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
         HDC hdc = GetDC(msg.hwnd);
 
+
+
         // 当前帧时间
         auto currentTime = Clock::now();
         std::chrono::duration<float> elapsedTime = currentTime - lastTime;
@@ -79,12 +88,20 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         std::string s = std::to_string((int)fps);
         TextOut(hdc, 1000, 100, std::wstring(s.begin(), s.end()).c_str(), 10);
 
-        // 画外边框(待删)
-        DrawCube(hdc, camera, Vector3(100.f, 100.f, -100.f), 200.f, 200.f, 200.f);
+        // 画立方体
+        DrawCube(hdc, camera, Vector3(100.f, 100.f, -100.f), 200.f, 200.f, 200.f, backbuffer, z_buffer);
         
+        for (int i = 0; i < width * height; i++) {
+            backbuffer[i] = 0xff000000;
+            z_buffer[i] = 0.f;
+        }
+
         ReleaseDC(msg.hwnd, hdc);
     }
 
+    // 释放堆内存
+    free(z_buffer);
+    delete backbuffer;
     return (int) msg.wParam;
 
 }
