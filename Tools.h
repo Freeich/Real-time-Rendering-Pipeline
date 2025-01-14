@@ -8,6 +8,8 @@
 #include <unordered_map>
 
 const float PI = 3.14159265358979323846;
+const int width = 800;
+const int height = 450;
 
 float Clamp(float value, float min, float max) {
 	if (value < min) return min;
@@ -505,8 +507,6 @@ Vector3 MVP(Vector3& point, Camera camera) {
 	}
 
 	// 视口变换
-	float width = 800.f;
-	float height = 450.f;
 	Matrix viewport_matrix(4, 4);
 	viewport_matrix.m[0][0] = width / 2;
 	viewport_matrix.m[0][3] = width / 2;
@@ -520,7 +520,7 @@ Vector3 MVP(Vector3& point, Camera camera) {
 }
 
 // 扫描线算法绘制单个三角形
-void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3, std::unordered_map<int, float>& z_buffer, const Camera& camera) {
+void DrawTriangle(ColoredVertex p1, ColoredVertex p2, ColoredVertex p3, float* z_buffer, uint32_t* backbuffer) {
 	
 	// 保护操作
 
@@ -585,11 +585,20 @@ void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3
 		for (float j = 0; j < total_width; j++) {
 			MyColor color = (color_end - color_start) * (j / total_width) + color_start;
 			Vector3 point = (end - start) * (j / total_width) + start;
-			int key = point.key();
+			int x = (int)point.x;
+			int y = (int)point.y;
+			float z = point.z;
+			int key = y * width + x;
 			if (point.x < 800.f and point.x > 0.f and point.y < 450.f and point.y > 0.f) {
-				if (not z_buffer.count(key) or (z_buffer.count(key) and point.z < z_buffer[key])) {
-					z_buffer[key] = point.z;
-					SetPixelV(hdc, point.x, point.y, RGB(color.r, color.g, color.b));
+				if (z_buffer[key] == 0.f or (z_buffer[key] != 0.f and z < z_buffer[key])) {
+					z_buffer[key] = z;
+					// 存储像素信息到backbuffer
+					uint32_t red = static_cast<uint32_t>(color.r);
+					uint32_t green = static_cast<uint32_t>(color.g);
+					uint32_t blue = static_cast<uint32_t>(color.b);
+					uint32_t alpha = 0xff;
+					backbuffer[key] = alpha << 24 | red << 16 | green << 8 | blue;
+					//SetPixelV(hdc, x, y, RGB(color.r, color.g, color.b));
 				}
 				
 			}
@@ -600,14 +609,36 @@ void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3
 
 
 // 传递三角信息
-void Render(HDC& hdc, const std::vector<Triangle>& triangles, const Camera& camera) {
+void Render(HDC& hdc, const std::vector<Triangle>& triangles) {
 
-	std::unordered_map<int, float> z_buffer = std::unordered_map<int, float>();
+	// Z-Buffer
+	float* z_buffer = (float*)calloc(width * height, sizeof(float));
+
+	// BackBuffer
+	uint32_t* backbuffer = new uint32_t[width * height];
 
 	// 给每个三角形进行线性插值上色
 	for (Triangle t : triangles) {
-		DrawTriangle(hdc, t.v1, t.v2, t.v3, z_buffer, camera);
+		DrawTriangle(t.v1, t.v2, t.v3, z_buffer, backbuffer);
 	}
+
+	BITMAPINFO bmi = { 0 };
+	bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+	bmi.bmiHeader.biWidth = width;
+	bmi.bmiHeader.biHeight = -height; // 从上到下扫描
+	bmi.bmiHeader.biPlanes = 1;
+	bmi.bmiHeader.biBitCount = 32; // 每像素 32 位 (RGB)
+	bmi.bmiHeader.biCompression = BI_RGB;
+
+	StretchDIBits(hdc,
+		0, 0, width, height,        // 绘制到目标区域
+		0, 0, width, height,        // 从源区域读取
+		backbuffer, &bmi,          // 像素数据和位图信息
+		DIB_RGB_COLORS, SRCCOPY);
+	
+	// 释放堆内存
+	free(z_buffer);
+	delete backbuffer;
 }
 
 
@@ -656,18 +687,18 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 		{5, 8, 7} };
 
 
-	DrawLine(hdc, bottom_1, bottom_2);
-	DrawLine(hdc, bottom_2, bottom_3);
-	DrawLine(hdc, bottom_3, bottom_4);
-	DrawLine(hdc, bottom_4, bottom_1);
-	DrawLine(hdc, top_1, top_2);
-	DrawLine(hdc, top_2, top_3);
-	DrawLine(hdc, top_3, top_4);
-	DrawLine(hdc, top_4, top_1);
-	DrawLine(hdc, top_1, bottom_1);
-	DrawLine(hdc, top_2, bottom_2);
-	DrawLine(hdc, top_3, bottom_3);
-	DrawLine(hdc, top_4, bottom_4);
+	//DrawLine(hdc, bottom_1, bottom_2);
+	//DrawLine(hdc, bottom_2, bottom_3);
+	//DrawLine(hdc, bottom_3, bottom_4);
+	//DrawLine(hdc, bottom_4, bottom_1);
+	//DrawLine(hdc, top_1, top_2);
+	//DrawLine(hdc, top_2, top_3);
+	//DrawLine(hdc, top_3, top_4);
+	//DrawLine(hdc, top_4, top_1);
+	//DrawLine(hdc, top_1, bottom_1);
+	//DrawLine(hdc, top_2, bottom_2);
+	//DrawLine(hdc, top_3, bottom_3);
+	//DrawLine(hdc, top_4, bottom_4);
 
 	TextOut(hdc, bottom_1.x, bottom_1.y, TEXT("1"), 1);
 	TextOut(hdc, bottom_2.x, bottom_2.y, TEXT("2"), 1);
@@ -681,12 +712,13 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 	std::vector<Triangle> ts = std::vector<Triangle>();
 
 	// 更改渲染的三角形的个数.
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < 12; i++) {
 		Triangle t = Triangle(vertexes[triangle_indexes[i][0]], vertexes[triangle_indexes[i][1]], vertexes[triangle_indexes[i][2]]);
 		ts.push_back(t);
 	}
 	
-	Render(hdc, ts, camera);
+	// 渲染操作
+	Render(hdc, ts);
 }
 
 void tick() {}
