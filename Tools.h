@@ -557,7 +557,7 @@ void DrawTriangle(ColoredVertex p1, ColoredVertex p2, ColoredVertex p3, float* z
 	//sss += std::to_string(int(v3.y));
 	//TextOut(hdc, 500, 540, std::wstring(sss.begin(), sss.end()).c_str(), 12);
 
-	for (float i = 0; i < total_height; i++) {
+	for (float i = 0; i <= total_height; i++) {
 
 		// 确定每条扫描线的起始位置
 		Vector3 start = (v1 - v3) * (i / total_height) + v3;
@@ -582,7 +582,7 @@ void DrawTriangle(ColoredVertex p1, ColoredVertex p2, ColoredVertex p3, float* z
 
 		// 画每一条扫描线的pixel
 		float total_width = end.x - start.x;
-		for (float j = 0; j < total_width; j++) {
+		for (float j = 0; j <= total_width; j++) {
 			MyColor color = (color_end - color_start) * (j / total_width) + color_start;
 			Vector3 point = (end - start) * (j / total_width) + start;
 			int x = (int)point.x;
@@ -636,6 +636,7 @@ void Render(HDC& hdc, const std::vector<Triangle>& triangles) {
 		backbuffer, &bmi,          // 像素数据和位图信息
 		DIB_RGB_COLORS, SRCCOPY);
 	
+
 	// 释放堆内存
 	free(z_buffer);
 	delete backbuffer;

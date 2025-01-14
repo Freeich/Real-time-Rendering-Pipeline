@@ -7,6 +7,7 @@
 #include <cmath>
 #include "Tools.h"
 #include <windowsx.h>
+#include <chrono>
 
 
 #define MAX_LOADSTRING 100
@@ -33,7 +34,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
-    // TODO: 在此处放置代码。
+    using Clock = std::chrono::high_resolution_clock;
+    auto lastTime = Clock::now();  // 上一帧时间
 
     // 初始化全局字符串
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -64,16 +66,23 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
         HDC hdc = GetDC(msg.hwnd);
 
-        // 每次画完重新填充为白色
-        RECT rect;
-        GetClientRect(msg.hwnd, &rect);
-        FillRect(hdc, &rect, (HBRUSH)(COLOR_WINDOW + 1));
+        // 当前帧时间
+        auto currentTime = Clock::now();
+        std::chrono::duration<float> elapsedTime = currentTime - lastTime;
+        lastTime = currentTime;
+
+        // 计算帧时间（秒）和 FPS
+        float frameTime = elapsedTime.count();
+        float fps = 1.0f / frameTime;
+
+        // 输出 FPS
+        std::string s = std::to_string((int)fps);
+        TextOut(hdc, 1000, 100, std::wstring(s.begin(), s.end()).c_str(), 10);
 
         // 画外边框(待删)
         DrawCube(hdc, camera, Vector3(100.f, 100.f, -100.f), 200.f, 200.f, 200.f);
         
         ReleaseDC(msg.hwnd, hdc);
-        //Sleep(200);
     }
 
     return (int) msg.wParam;
