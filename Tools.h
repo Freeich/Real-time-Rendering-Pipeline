@@ -24,23 +24,23 @@ struct MyColor {
 
 
 	MyColor operator-(MyColor& color_sec) {
-		float rn = Clamp(r - color_sec.r, 0.f, 255.f);
-		float gn = Clamp(g - color_sec.g, 0.f, 255.f);
-		float bn = Clamp(b - color_sec.b, 0.f, 255.f);
+		float rn = r - color_sec.r;
+		float gn = g - color_sec.g;
+		float bn = b - color_sec.b;
 		return MyColor(rn, gn, bn);
 	}
 
 	MyColor operator+(MyColor& color_sec) {
-		float rn = Clamp(r + color_sec.r, 0.f, 255.f);
-		float gn = Clamp(g + color_sec.g, 0.f, 255.f);
-		float bn = Clamp(b + color_sec.b, 0.f, 255.f);
+		float rn = r + color_sec.r;
+		float gn = g + color_sec.g;
+		float bn = b + color_sec.b;
 		return MyColor(rn, gn, bn);
 	}
 
 	MyColor operator*(float k) {
-		float rn = Clamp(r * k, 0.f, 255.f);
-		float gn = Clamp(g * k, 0.f, 255.f);
-		float bn = Clamp(b * k, 0.f, 255.f);
+		float rn = r * k;
+		float gn = g * k;
+		float bn = b * k;
 		return MyColor(rn, gn, bn);
 	}
 
@@ -510,15 +510,16 @@ Vector3 MVP(Vector3& point, Camera camera) {
 }
 
 // 扫描线算法绘制单个三角形
-void DrawTriangle(HDC& hdc, ColoredVertex& p1, ColoredVertex& p2, ColoredVertex& p3) {
+void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3) {
 	
 	// 保护操作
 
 	
 	// 首先确保三个坐标顺序
 	if (p1.y < p2.y) std::swap(p1, p2);
-	if (p2.y < p3.y) std::swap(p2, p3);
 	if (p1.y < p3.y) std::swap(p1, p3);
+	if (p2.y < p3.y) std::swap(p2, p3);
+	
 
 	Vector2 v1 = Vector2(p1.x, p1.y);
 	Vector2 v2 = Vector2(p2.x, p2.y);
@@ -546,7 +547,7 @@ void DrawTriangle(HDC& hdc, ColoredVertex& p1, ColoredVertex& p2, ColoredVertex&
 	sss += std::to_string(int(v3.y));
 	TextOut(hdc, 500, 540, std::wstring(sss.begin(), sss.end()).c_str(), 12);
 
-	for (int i = 0; i < total_height; i++) {
+	for (float i = 0; i < total_height; i++) {
 
 		// 确定每条扫描线的起始位置
 		Vector2 start = (v1 - v3) * (i / total_height) + v3;
@@ -571,7 +572,7 @@ void DrawTriangle(HDC& hdc, ColoredVertex& p1, ColoredVertex& p2, ColoredVertex&
 
 		// 画每一条扫描线的pixel
 		float total_width = end.x - start.x;
-		for (int j = 0; j < total_width; j++) {
+		for (float j = 0; j < total_width; j++) {
 			MyColor color = (color_end - color_start) * (j / total_width) + color_start;
 			if (start.x + j < 800.f and start.x + j > 0.f and start.y < 450.f and start.y > 0.f) {
 				SetPixelV(hdc, start.x + j, start.y, RGB(color.r, color.g, color.b));
@@ -613,22 +614,22 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 	top_4 = MVP(top_4, camera);
 
 	std::map<int, ColoredVertex> vertexes{
-									{1, ColoredVertex(bottom_1.x, bottom_1.y, bottom_1.z, MyColor(0.f, 0.f, 0.f))},
-									{2, ColoredVertex(bottom_2.x, bottom_2.y, bottom_2.z, MyColor(0.f, 0.f, 255.f))},
-									{3, ColoredVertex(bottom_3.x, bottom_3.y, bottom_3.z, MyColor(0.f, 255.f, 0.f))},
-									{4, ColoredVertex(bottom_4.x, bottom_4.y, bottom_4.z, MyColor(0.f, 255.f, 255.f))},
-									{5, ColoredVertex(top_1.x, top_1.y, top_1.z, MyColor(255.f, 0.f, 0.f))},
-									{6, ColoredVertex(top_2.x, top_2.y, top_2.z, MyColor(255.f, 0.f, 255.f))},
-									{7, ColoredVertex(top_3.x, top_3.y, top_3.z, MyColor(255.f, 255.f, 0.f))},
-									{8, ColoredVertex(top_4.x, top_4.y, top_4.z, MyColor(255.f, 255.f, 255.f))}};
+									{1, ColoredVertex(bottom_1.x, bottom_1.y, bottom_1.z, MyColor(255.f, 255.f, 255.f))},
+									{2, ColoredVertex(bottom_2.x, bottom_2.y, bottom_2.z, MyColor(255.f, 255.f, 0.f))},
+									{3, ColoredVertex(bottom_3.x, bottom_3.y, bottom_3.z, MyColor(255.f, 0.f, 0.f))},
+									{4, ColoredVertex(bottom_4.x, bottom_4.y, bottom_4.z, MyColor(255.f, 0.f, 255.f))},
+									{5, ColoredVertex(top_1.x, top_1.y, top_1.z, MyColor(0.f, 255.f, 255.f))},
+									{6, ColoredVertex(top_2.x, top_2.y, top_2.z, MyColor(0.f, 255.f, 0.f))},
+									{7, ColoredVertex(top_3.x, top_3.y, top_3.z, MyColor(0.f, 0.f, 0.f))},
+									{8, ColoredVertex(top_4.x, top_4.y, top_4.z, MyColor(0.f, 0.f, 255.f))}};
 
 	std::vector<std::vector<int>> triangle_indexes = {
 		{1, 2, 3},
 		{1, 4, 3},
 		{2, 3, 7},
 		{2, 6, 7},
-		{3, 4, 8},
-		{3, 7, 8},
+		{4, 3, 7},
+		{4, 8, 7},
 		{1, 4, 8},
 		{1, 5, 8},
 		{1, 2, 6},
@@ -662,7 +663,7 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 	std::vector<Triangle> ts = std::vector<Triangle>();
 
 	// 更改渲染的三角形的个数.
-	for (int i = 0; i < 6; i++) {
+	for (int i = 0; i < 12; i++) {
 		Triangle t = Triangle(vertexes[triangle_indexes[i][0]], vertexes[triangle_indexes[i][1]], vertexes[triangle_indexes[i][2]]);
 		ts.push_back(t);
 	}
