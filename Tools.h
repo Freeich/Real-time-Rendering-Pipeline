@@ -5,6 +5,7 @@
 #include <string>
 #include <algorithm>
 #include <map>
+#include <unordered_map>
 
 const float PI = 3.14159265358979323846;
 
@@ -223,6 +224,11 @@ public:
 		return Vector3(x_normal, y_normal, z_normal);
 	}
 
+	int key() {
+		/*int flag = x - y < 0 ? -1 : 1;*/
+		return ((int)x) * 1000  + ((int)(y));
+	}
+
 	// 归一化
 	Vector3 Normalize() {
 		float len = length();
@@ -266,6 +272,10 @@ public:
 	// 减法
 	Vector2 operator-(const Vector2& vector_sec) {
 		return Vector2(x - vector_sec.x, y - vector_sec.y);
+	}
+
+	bool operator==(const Vector2& vector_sec) const {
+		return x == vector_sec.x && y == vector_sec.y;
 	}
 
 	// 数乘
@@ -510,7 +520,7 @@ Vector3 MVP(Vector3& point, Camera camera) {
 }
 
 // 扫描线算法绘制单个三角形
-void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3) {
+void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3, std::unordered_map<int, float>& z_buffer, const Camera& camera) {
 	
 	// 保护操作
 
@@ -521,9 +531,9 @@ void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3
 	if (p2.y < p3.y) std::swap(p2, p3);
 	
 
-	Vector2 v1 = Vector2(p1.x, p1.y);
-	Vector2 v2 = Vector2(p2.x, p2.y);
-	Vector2 v3 = Vector2(p3.x, p3.y);
+	Vector3 v1 = Vector3(p1.x, p1.y, p1.z);
+	Vector3 v2 = Vector3(p2.x, p2.y, p2.z);
+	Vector3 v3 = Vector3(p3.x, p3.y, p3.z);
 	MyColor c1 = p1.c;
 	MyColor c2 = p2.c;
 	MyColor c3 = p3.c;
@@ -532,26 +542,26 @@ void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3
 	float down_height = v2.y - v3.y;
 	float up_height = v1.y - v2.y;
 
-	std::string s = std::to_string(int(v1.x));
-	s += "-";
-	s += std::to_string(int(v1.y));
-	TextOut(hdc, 500, 500, std::wstring(s.begin(), s.end()).c_str(), 12);
+	//std::string s = std::to_string(int(v1.x));
+	//s += "-";
+	//s += std::to_string(int(v1.y));
+	//TextOut(hdc, 500, 500, std::wstring(s.begin(), s.end()).c_str(), 12);
 
-	std::string ss = std::to_string(int(v2.x));
-	ss += "-";
-	ss += std::to_string(int(v2.y));
-	TextOut(hdc, 500, 520, std::wstring(ss.begin(), ss.end()).c_str(), 12);
+	//std::string ss = std::to_string(int(v2.x));
+	//ss += "-";
+	//ss += std::to_string(int(v2.y));
+	//TextOut(hdc, 500, 520, std::wstring(ss.begin(), ss.end()).c_str(), 12);
 
-	std::string sss = std::to_string(int(v3.x));
-	sss += "-";
-	sss += std::to_string(int(v3.y));
-	TextOut(hdc, 500, 540, std::wstring(sss.begin(), sss.end()).c_str(), 12);
+	//std::string sss = std::to_string(int(v3.x));
+	//sss += "-";
+	//sss += std::to_string(int(v3.y));
+	//TextOut(hdc, 500, 540, std::wstring(sss.begin(), sss.end()).c_str(), 12);
 
 	for (float i = 0; i < total_height; i++) {
 
 		// 确定每条扫描线的起始位置
-		Vector2 start = (v1 - v3) * (i / total_height) + v3;
-		Vector2 end;
+		Vector3 start = (v1 - v3) * (i / total_height) + v3;
+		Vector3 end;
 		MyColor color_start = (c1 - c3) * (i / total_height) + c3;
 		MyColor color_end;
 
@@ -574,8 +584,14 @@ void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3
 		float total_width = end.x - start.x;
 		for (float j = 0; j < total_width; j++) {
 			MyColor color = (color_end - color_start) * (j / total_width) + color_start;
-			if (start.x + j < 800.f and start.x + j > 0.f and start.y < 450.f and start.y > 0.f) {
-				SetPixelV(hdc, start.x + j, start.y, RGB(color.r, color.g, color.b));
+			Vector3 point = (end - start) * (j / total_width) + start;
+			int key = point.key();
+			if (point.x < 800.f and point.x > 0.f and point.y < 450.f and point.y > 0.f) {
+				if (not z_buffer.count(key) or (z_buffer.count(key) and point.z < z_buffer[key])) {
+					z_buffer[key] = point.z;
+					SetPixelV(hdc, point.x, point.y, RGB(color.r, color.g, color.b));
+				}
+				
 			}
 		}
 
@@ -584,11 +600,13 @@ void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3
 
 
 // 传递三角信息
-void Render(HDC& hdc, const std::vector<Triangle>& triangles) {
+void Render(HDC& hdc, const std::vector<Triangle>& triangles, const Camera& camera) {
+
+	std::unordered_map<int, float> z_buffer = std::unordered_map<int, float>();
 
 	// 给每个三角形进行线性插值上色
 	for (Triangle t : triangles) {
-		DrawTriangle(hdc, t.v1, t.v2, t.v3);
+		DrawTriangle(hdc, t.v1, t.v2, t.v3, z_buffer, camera);
 	}
 }
 
@@ -663,12 +681,12 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 	std::vector<Triangle> ts = std::vector<Triangle>();
 
 	// 更改渲染的三角形的个数.
-	for (int i = 0; i < 12; i++) {
+	for (int i = 0; i < 4; i++) {
 		Triangle t = Triangle(vertexes[triangle_indexes[i][0]], vertexes[triangle_indexes[i][1]], vertexes[triangle_indexes[i][2]]);
 		ts.push_back(t);
 	}
-
-	Render(hdc, ts);
+	
+	Render(hdc, ts, camera);
 }
 
 void tick() {}
