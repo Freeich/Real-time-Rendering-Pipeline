@@ -91,6 +91,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         // 画立方体
         DrawCube(hdc, camera, Vector3(100.f, 100.f, -100.f), 200.f, 200.f, 200.f, backbuffer, z_buffer);
         
+        // 重置backbuffer和zbuffer
         for (int i = 0; i < width * height; i++) {
             backbuffer[i] = 0xff000000;
             z_buffer[i] = 0.f;
