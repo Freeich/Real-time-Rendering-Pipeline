@@ -9,8 +9,8 @@
 #include <unordered_set>
 
 const float PI = 3.14159265358979323846;
-const int width = 800;
-const int height = 450;
+const int width = 900;
+const int height = 900;
 
 float Clamp(float value, float min, float max) {
 	if (value < min) return min;
@@ -340,6 +340,9 @@ public:
 	Vector3 location_;
 	Vector3 lookat_;
 	Vector3 top_;
+	Vector3 look_point_;
+	float radius = 300.f;
+
 	float pitch_;
 	float yaw_;
 	float roll_;
@@ -348,6 +351,7 @@ public:
 		location_(Vector3(0.f, 0.f, 0.f)), 
 		lookat_(Vector3(0.f, 0.f, -1.f)), 
 		top_(Vector3(0.f, 1.f, 0.f)),
+		look_point_(Vector3(200.f, 200.f, -200.f)),
 		pitch_(0.0f),
 		yaw_(0.0f),
 		roll_(0.0f){};
@@ -356,11 +360,15 @@ public:
 		location_(location), 
 		lookat_(lookat), 
 		top_(top),
+		look_point_(Vector3(200.f, 200.f, -200.f)),
 		pitch_(0.0f),
 		yaw_(0.0f),
 		roll_(0.0f) {};
 
-	Vector3 GetLocation() { return location_; };
+	Vector3 GetLocation() { 
+		return location_; 
+	};
+
 	Vector3 GetTop() { return top_; };
 
 	Vector3 GetLookat() { 
@@ -405,8 +413,43 @@ public:
 	};
 };
 
+
+//void OrthosTransform(Vector3& point, float z_near, float z_far) {
+//	
+//	Matrix point_matrix = point.PointToMatrix();
+//
+//
+//
+//	float xr = 0.5f;
+//	float xl = -0.5f;
+//	float yt = 0.5f;
+//	float yb = -0.5f;
+//
+//	Matrix ortho_scale = Matrix();
+//	ortho_scale.m[0][0] = 2.f / (xr - xl);
+//	ortho_scale.m[1][1] = 2.f / (yt - yb);
+//	ortho_scale.m[2][2] = 2.f / (z_near - z_far);
+//	ortho_scale.m[3][3] = 1.f;
+//
+//	Matrix orthos_translate = Matrix();
+//	orthos_translate.m[0][0] = 1.f;
+//	orthos_translate.m[1][1] = 1.f;
+//	orthos_translate.m[2][2] = 1.f;
+//	orthos_translate.m[3][3] = 1.f;
+//	orthos_translate.m[0][3] = -1 * (xr + xl) / 2.f;
+//	orthos_translate.m[1][3] = -1 * (yt + yb) / 2.f;
+//	orthos_translate.m[2][3] = -1 * (z_near + z_far) / 2.f;;
+//
+//	point_matrix = orthos_translate * point_matrix;
+//	point_matrix = ortho_scale * point_matrix;
+//
+//	point.x = point_matrix.m[0][0];
+//	point.y = point_matrix.m[1][0];
+//	point.z = point_matrix.m[2][0];
+//}
+
 // MVP算法
-Vector3 MVP(Vector3& point, Camera camera) {
+float MVP(Vector3& point, Camera camera) {
 	
 	// Vector转换为Matrix方便计算
 	Matrix point_matrix = point.PointToMatrix();
@@ -451,30 +494,27 @@ Vector3 MVP(Vector3& point, Camera camera) {
 
 	point_matrix = translate * point_matrix;
 	point_matrix = rotate * point_matrix;
-	
-	// 透视矩阵
-	float fov = 90.f;
-	float aspect = 16.f / 9.f;
-	float z_near = -0.1f;
-	float z_far = -1000.f;
 
 	Matrix pers_proj(4, 4);
 
-	//pers_proj.m[0][0] = z_near / 1.f;
-	//pers_proj.m[1][1] = z_near / 1.f;
-	//pers_proj.m[2][2] = (z_near + z_far) / (z_far - z_near);
-	//pers_proj.m[2][3] = -1 * (2 * z_near * z_far) / (z_far - z_near);
-	//pers_proj.m[3][2] = 1.f;
+	// 投影变换
+	float z_near = -0.1f;
+	float z_far = -1000.f;
 
-	pers_proj.m[0][0] = z_near;
-	pers_proj.m[1][1] = z_near;
-	pers_proj.m[2][2] = (z_near + z_far);
-	pers_proj.m[2][3] = -1 * (z_near * z_far);
+	pers_proj.m[0][0] = z_near / 1.f;
+	pers_proj.m[1][1] = z_near / 1.f;
+	pers_proj.m[2][2] = (z_near + z_far) / (z_far - z_near);
+	pers_proj.m[2][3] = -1 * (2 * z_near * z_far) / (z_far - z_near);
 	pers_proj.m[3][2] = 1.f;
+
+	//pers_proj.m[0][0] = z_near;
+	//pers_proj.m[1][1] = z_near;
+	//pers_proj.m[2][2] = (z_near + z_far);
+	//pers_proj.m[2][3] = -1 * (z_near * z_far);
+	//pers_proj.m[3][2] = 1.f;
 
 	point_matrix = pers_proj * point_matrix;
 
-	// 裁剪
 	if (point_matrix.m[3][0] != 0.f) {
 		point_matrix.m[0][0] = point_matrix.m[0][0] / point_matrix.m[3][0];
 		point_matrix.m[1][0] = point_matrix.m[1][0] / point_matrix.m[3][0];
@@ -482,32 +522,11 @@ Vector3 MVP(Vector3& point, Camera camera) {
 		point_matrix.m[3][0] = point_matrix.m[3][0] / point_matrix.m[3][0];
 	}
 
-	float xr = 0.5f;
-	float xl = -0.5f;
-	float yt = 0.5f;
-	float yb = -0.5f;
+	point.x = point_matrix.m[0][0];
+	point.y = point_matrix.m[1][0];
+	point.z = point_matrix.m[2][0];
 
-	Matrix ortho_scale = Matrix();
-	ortho_scale.m[0][0] = 2.f / (xr - xl);
-	ortho_scale.m[1][1] = 2.f / (yt - yb);
-	ortho_scale.m[2][2] = 2.f / (z_near - z_far);
-	ortho_scale.m[3][3] = 1.f;
-
-	Matrix orthos_translate = Matrix();
-	orthos_translate.m[0][0] = 1.f;
-	orthos_translate.m[1][1] = 1.f;
-	orthos_translate.m[2][2] = 1.f;
-	orthos_translate.m[3][3] = 1.f;
-	orthos_translate.m[0][3] = -1 * (xr + xl) / 2.f;
-	orthos_translate.m[1][3] = -1 * (yt + yb) / 2.f;
-	orthos_translate.m[2][3] = -1 * (z_near + z_far) / 2.f;
-
-	point_matrix = orthos_translate * point_matrix;
-	point_matrix = ortho_scale * point_matrix;
-
-
-
-	return Vector3(point_matrix.m[0][0], point_matrix.m[1][0], point_matrix.m[2][0]);
+	return point_matrix.m[3][0];
 }
 
 // 视口变换
@@ -519,7 +538,8 @@ void ViewportTransform(Vector3& point) {
 	viewport_matrix.m[0][3] = width / 2;
 	viewport_matrix.m[1][1] = height / 2;
 	viewport_matrix.m[1][3] = height / 2;
-	viewport_matrix.m[2][2] = 1.f;
+	viewport_matrix.m[2][2] = 1 / 2.f;
+	viewport_matrix.m[2][3] = 1 / 2.f;
 	viewport_matrix.m[3][3] = 1.f;
 
 	point_matrix = viewport_matrix * point_matrix;
@@ -530,9 +550,6 @@ void ViewportTransform(Vector3& point) {
 
 // 扫描线算法绘制单个三角形
 void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3, float* z_buffer, uint32_t* backbuffer) {
-	
-	// 保护操作
-
 	
 	// 首先确保三个坐标顺序
 	if (p1.y < p2.y) std::swap(p1, p2);
@@ -551,25 +568,25 @@ void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3
 	float down_height = v2.y - v3.y;
 	float up_height = v1.y - v2.y;
 
-	std::string s = std::to_string(v1.z);
-	s += "-";
-	//s += std::to_string(int(v1.z));
-	TextOut(hdc, 500, 500, std::wstring(s.begin(), s.end()).c_str(), 12);
+	//std::string s = std::to_string(v1.z);
+	//s += "-";
+	////s += std::to_string(int(v1.z));
+	//TextOut(hdc, 500, 500, std::wstring(s.begin(), s.end()).c_str(), 12);
 
-	std::string ss = std::to_string(v2.z);
-	ss += "-";
-	//ss += std::to_string(int(v2.z));
-	TextOut(hdc, 500, 520, std::wstring(ss.begin(), ss.end()).c_str(), 12);
+	//std::string ss = std::to_string(v2.z);
+	//ss += "-";
+	////ss += std::to_string(int(v2.z));
+	//TextOut(hdc, 500, 520, std::wstring(ss.begin(), ss.end()).c_str(), 12);
 
-	std::string sss = std::to_string(v3.z);
-	sss += "-";
-	//sss += std::to_string(int(v3.z));
-	TextOut(hdc, 500, 540, std::wstring(sss.begin(), sss.end()).c_str(), 12);
+	//std::string sss = std::to_string(v3.z);
+	//sss += "-";
+	////sss += std::to_string(int(v3.z));
+	//TextOut(hdc, 500, 540, std::wstring(sss.begin(), sss.end()).c_str(), 12);
 
 	for (float i = 0; i <= total_height; i++) {
-
 		// 确定每条扫描线的起始位置
 		Vector3 start = (v1 - v3) * (i / total_height) + v3;
+		if (start.y > 900.f) break;
 		Vector3 end;
 		MyColor color_start = (c1 - c3) * (i / total_height) + c3;
 		MyColor color_end;
@@ -598,7 +615,8 @@ void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3
 			int y = (int)point.y;
 			float z = point.z;
 			int key = y * width + x;
-			if (point.x < 800.f and point.x > 0.f and point.y < 450.f and point.y > 0.f) {
+			if (x > 900.f) break;
+			if (point.x < 900.f and point.x > 0.f and point.y < 900.f and point.y > 0.f) {
 				if (z_buffer[key] == 0.f or (z_buffer[key] != 0.f and z < z_buffer[key])) {
 					z_buffer[key] = z;
 					// 存储像素信息到backbuffer
@@ -667,17 +685,33 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 	Vector3 top_3(bottom_3.x, bottom_3.y + height, bottom_3.z);
 	Vector3 top_4(bottom_4.x, bottom_4.y + height, bottom_4.z);
 
+	// 视角变换
+	float w1 = MVP(bottom_1, camera);
+	float w2 = MVP(bottom_2, camera);
+	float w3 = MVP(bottom_3, camera);
+	float w4 = MVP(bottom_4, camera);
+	float w5 = MVP(top_1, camera);
+	float w6 = MVP(top_2, camera);
+	float w7 = MVP(top_3, camera);
+	float w8 = MVP(top_4, camera);
 
-	bottom_1 = MVP(bottom_1, camera);
-	bottom_2 = MVP(bottom_2, camera);
-	bottom_3 = MVP(bottom_3, camera);
-	bottom_4 = MVP(bottom_4, camera);
-	top_1 = MVP(top_1, camera);
-	top_2 = MVP(top_2, camera);
-	top_3 = MVP(top_3, camera);
-	top_4 = MVP(top_4, camera);
+	std::vector<Vector3> points = { bottom_1, bottom_2, bottom_3, bottom_4, top_1, top_2, top_3, top_4 };
 
-	std::vector<Vector3> points = {bottom_1, bottom_2, bottom_3, bottom_4, top_1, top_2, top_3, top_4};
+	std::string s = std::to_string(points[0].x);
+	s += "-";
+	//s += std::to_string(int(v1.z));
+	TextOut(hdc, 500, 500, std::wstring(s.begin(), s.end()).c_str(), 12);
+
+	std::string ss = std::to_string(points[0].y);
+	ss += "-";
+	//ss += std::to_string(int(v2.z));
+	TextOut(hdc, 500, 520, std::wstring(ss.begin(), ss.end()).c_str(), 12);
+
+	std::string sss = std::to_string(points[0].z);
+	sss += "-";
+	//sss += std::to_string(int(v3.z));
+	TextOut(hdc, 500, 540, std::wstring(sss.begin(), sss.end()).c_str(), 12);
+
 	std::vector<MyColor> colors{
 								MyColor(255.f, 255.f, 255.f),
 								MyColor(255.f, 255.f, 0.f),
@@ -707,26 +741,31 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 		MyColor c2 = colors[triangles[i][1] - 1];
 		MyColor c3 = colors[triangles[i][2] - 1];
 
-
 		// 首先，剔除所有不在视锥体里面的
 		bool f1 = (p1.x <= -1.f or p1.x >= 1.f) or (p1.y <= -1.f or p1.y >= 1.f) or (p1.z <= -1.f);
 		bool f2 = (p2.x <= -1.f or p2.x >= 1.f) or (p2.y <= -1.f or p2.y >= 1.f) or (p2.z <= -1.f);
 		bool f3 = (p3.x <= -1.f or p3.x >= 1.f) or (p3.y <= -1.f or p3.y >= 1.f) or (p3.z <= -1.f);
-		
-		if (f1 and f2 and f3) cute_triangles.insert(i);
+
+
+
+		if (f1 and f2 and f3) 
+			cute_triangles.insert(i);
 		else {
 			// 超过近平面的三角形
-			bool b1 = p1.z < -1.f;
-			bool b2 = p2.z < -1.f;
-			bool b3 = p3.z < -1.f;
+			bool b1 = p1.z <= -1.f;
+			bool b2 = p2.z <= -1.f;
+			bool b3 = p3.z <= -1.f;
 			int result = b1 + b2 + b3;
 			if (result == 0) continue;
 			else {
 				if (result == 1) {
 					cute_triangles.insert(i);
-					if (b2) std::swap(p1, p2); std::swap(i1, i2);
-					if (b3) std::swap(p1, p3); std::swap(i1, i3);
-
+					if (b2) {
+						std::swap(p1, p2); std::swap(i1, i2);
+					} 
+					if (b3) {
+						std::swap(p1, p3); std::swap(i1, i3);
+					} 
 
 					// 计算出交点和交点的颜色值
 					float t1 = (-1.f - p1.z) / (p2.z - p1.z);
@@ -749,27 +788,40 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 
 					// 将新三角形塞入待渲染列表
 					triangles.push_back({ i2, i3, index1 });
-					triangles.push_back({ i2, index1, index2 });
+					triangles.push_back({ i3, index1, index2 });
 				}
 				else if (result == 2) {
-					if (not b2) std::swap(p1, p2); std::swap(i1, i2);
-					if (not b3) std::swap(p1, p3); std::swap(i1, i3);
+					cute_triangles.insert(i);
+					if (not b2) {
+						std::swap(p1, p2); 
+						std::swap(i1, i2);
+					}
+					if (not b3) {
+						std::swap(p1, p3); 
+						std::swap(i1, i3);
+					} 
 					
 					// 计算出交点和交点的颜色值
-					float t1 = (-1.f - p1.z) / (p2.z - p1.z);
-					float t2 = (-1.f - p1.z) / (p3.z - p1.z);
+					float t1 = (-1.f - p2.z) / (p1.z - p2.z);
+					float t2 = (-1.f - p3.z) / (p1.z - p3.z);
 
-					Vector3 ins1 = p1 + (p2 - p1) * t1;
-					Vector3 ins2 = p1 + (p3 - p1) * t2;
+					Vector3 ins1 = (p1 - p2) * t1 + p2;
+					Vector3 ins2 = (p1 - p3) * t2 + p3;
 
-					MyColor colr1 = (c2 - c1) * t1 + c1;
-					MyColor colr2 = (c3 - c1) * t2 + c1;
+					MyColor colr1 = (c1 - c2) * t1 + c2;
+					MyColor colr2 = (c1 - c3) * t2 + c3;
 
-					points[i2 - 1] = ins1;
-					points[i3 - 1] = ins2;
+					// 将新生成的点的位置和颜色信息压入
+					points.push_back(ins1);
+					colors.push_back(colr1);
+					int index1 = points.size(); // 新生成的点对应的index
 
-					colors[i2 - 1] = colr1;
-					colors[i3 - 1] = colr2;
+					points.push_back(ins2);
+					colors.push_back(colr2);
+					int index2 = points.size(); // 新生成的点对应的index
+
+					// 将新三角形塞入待渲染列表
+					triangles.push_back({ i1, index1, index2 });
 				}
 			}
 		}
@@ -803,8 +855,8 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 		DrawLine(hdc, points[new_triangles[i][2] - 1], points[new_triangles[i][0] - 1]);
 	}
 
-	// 标记顶点
-	//TextOut(hdc, bottom_1.x, bottom_1.y, TEXT("1"), 1);
+	//// 标记顶点
+	//TextOut(hdc, points[0].x, points[0].y, TEXT("1"), 1);
 	//TextOut(hdc, bottom_2.x, bottom_2.y, TEXT("2"), 1);
 	//TextOut(hdc, bottom_3.x, bottom_3.y, TEXT("3"), 1);
 	//TextOut(hdc, bottom_4.x, bottom_4.y, TEXT("4"), 1);

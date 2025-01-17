@@ -18,6 +18,8 @@ WCHAR szTitle[MAX_LOADSTRING];                  // 标题栏文本
 WCHAR szWindowClass[MAX_LOADSTRING];            // 主窗口类名
 
 Camera camera = Camera(); // 创建全局相机
+float translate_step = 10.1f;
+float roate_step = 3.f;
 
 // 此代码模块中包含的函数的前向声明:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -81,15 +83,19 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         lastTime = currentTime;
 
         // 计算帧时间（秒）和 FPS
-        float frameTime = elapsedTime.count();
-        float fps = 1.0f / frameTime;
+        float frame_time = elapsedTime.count();
+        float fps = 1.0f / frame_time;
+
+        //translate_step = 100.f * frame_time;
+        //roate_step = 5.f * frame_time;
+        
 
         // 输出 FPS
         std::string s = std::to_string((int)fps);
         TextOut(hdc, 1000, 100, std::wstring(s.begin(), s.end()).c_str(), 10);
 
         // 画立方体
-        DrawCube(hdc, camera, Vector3(100.f, 100.f, -100.f), 200.f, 200.f, 200.f, backbuffer, z_buffer);
+        DrawCube(hdc, camera, Vector3(100.f, 100.f, -0.2f), 200.f, 200.f, 200.f, backbuffer, z_buffer);
         
         // 重置backbuffer和zbuffer
         for (int i = 0; i < width * height; i++) {
@@ -174,8 +180,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    float translate_step = 10.f;
-    float roate_step = 3.f;
     switch (message)
     {
     case WM_COMMAND:
@@ -219,11 +223,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 break;
 
             case 'w':
-                camera.location_.y += translate_step;
+                camera.location_.z += translate_step;
                 break;
 
             case 's':
-                camera.location_.y -= translate_step;
+                camera.location_.z -= translate_step;
                 break;
 
             default:
@@ -241,14 +245,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             case VK_RIGHT:
                 camera.pitch_ += roate_step;
+
+
                 break;
 
             case VK_UP:
-                camera.roll_ = Clamp(camera.roll_ - roate_step, -90.f, 90.f);
+                camera.roll_ = camera.roll_ - roate_step;
+
+
                 break;
 
             case VK_DOWN:
-                camera.roll_ = Clamp(camera.roll_ + roate_step, -90.f, 90.f);
+                camera.roll_ = camera.roll_ + roate_step;
+ 
+
                 break;
 
             default:
