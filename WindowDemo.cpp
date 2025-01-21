@@ -18,7 +18,7 @@ WCHAR szTitle[MAX_LOADSTRING];                  // 标题栏文本
 WCHAR szWindowClass[MAX_LOADSTRING];            // 主窗口类名
 
 Camera camera = Camera(); // 创建全局相机
-float translate_step = 10.1f;
+float translate_step = 1.f;
 float roate_step = 3.f;
 
 // 此代码模块中包含的函数的前向声明:
@@ -75,8 +75,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
         HDC hdc = GetDC(msg.hwnd);
 
-
-
         // 当前帧时间
         auto currentTime = Clock::now();
         std::chrono::duration<float> elapsedTime = currentTime - lastTime;
@@ -95,7 +93,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         TextOut(hdc, 1000, 100, std::wstring(s.begin(), s.end()).c_str(), 10);
 
         // 画立方体
-        DrawCube(hdc, camera, Vector3(100.f, 100.f, -0.2f), 200.f, 200.f, 200.f, backbuffer, z_buffer);
+        DrawCube(hdc, camera, Vector3(100.f, 100.f, -20.f), 200.f, 200.f, 200.f, backbuffer, z_buffer);
         
         // 重置backbuffer和zbuffer
         for (int i = 0; i < width * height; i++) {

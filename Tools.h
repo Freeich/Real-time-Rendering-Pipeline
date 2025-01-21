@@ -515,6 +515,19 @@ float MVP(Vector3& point, Camera camera) {
 
 	point_matrix = pers_proj * point_matrix;
 
+	point.x = point_matrix.m[0][0];
+	point.y = point_matrix.m[1][0];
+	point.z = point_matrix.m[2][0];
+
+
+	return point_matrix.m[3][0];
+}
+
+// 视口变换
+void ViewportTransform(Vector3& point, float w) {
+	Matrix point_matrix = point.PointToMatrix();
+	point_matrix.m[3][0] = w;
+
 	if (point_matrix.m[3][0] != 0.f) {
 		point_matrix.m[0][0] = point_matrix.m[0][0] / point_matrix.m[3][0];
 		point_matrix.m[1][0] = point_matrix.m[1][0] / point_matrix.m[3][0];
@@ -522,25 +535,14 @@ float MVP(Vector3& point, Camera camera) {
 		point_matrix.m[3][0] = point_matrix.m[3][0] / point_matrix.m[3][0];
 	}
 
-	point.x = point_matrix.m[0][0];
-	point.y = point_matrix.m[1][0];
-	point.z = point_matrix.m[2][0];
-
-	return point_matrix.m[3][0];
-}
-
-// 视口变换
-void ViewportTransform(Vector3& point) {
-	Matrix point_matrix = point.PointToMatrix();
-
 	Matrix viewport_matrix(4, 4);
 	viewport_matrix.m[0][0] = width / 2;
 	viewport_matrix.m[0][3] = width / 2;
 	viewport_matrix.m[1][1] = height / 2;
 	viewport_matrix.m[1][3] = height / 2;
-	viewport_matrix.m[2][2] = 1 / 2.f;
-	viewport_matrix.m[2][3] = 1 / 2.f;
-	viewport_matrix.m[3][3] = 1.f;
+	viewport_matrix.m[2][2] = 1;
+	viewport_matrix.m[2][3] = 1;
+	viewport_matrix.m[3][3] = 1;
 
 	point_matrix = viewport_matrix * point_matrix;
 	point.x = point_matrix.m[0][0];
@@ -686,31 +688,32 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 	Vector3 top_4(bottom_4.x, bottom_4.y + height, bottom_4.z);
 
 	// 视角变换
-	float w1 = MVP(bottom_1, camera);
-	float w2 = MVP(bottom_2, camera);
-	float w3 = MVP(bottom_3, camera);
-	float w4 = MVP(bottom_4, camera);
-	float w5 = MVP(top_1, camera);
-	float w6 = MVP(top_2, camera);
-	float w7 = MVP(top_3, camera);
-	float w8 = MVP(top_4, camera);
+	float w_1 = MVP(bottom_1, camera);
+	float w_2 = MVP(bottom_2, camera);
+	float w_3 = MVP(bottom_3, camera);
+	float w_4 = MVP(bottom_4, camera);
+	float w_5 = MVP(top_1, camera);
+	float w_6 = MVP(top_2, camera);
+	float w_7 = MVP(top_3, camera);
+	float w_8 = MVP(top_4, camera);
 
+	std::vector<float> w_value = { w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8 };
 	std::vector<Vector3> points = { bottom_1, bottom_2, bottom_3, bottom_4, top_1, top_2, top_3, top_4 };
 
 	std::string s = std::to_string(points[0].x);
 	s += "-";
 	//s += std::to_string(int(v1.z));
-	TextOut(hdc, 500, 500, std::wstring(s.begin(), s.end()).c_str(), 12);
+	TextOut(hdc, 1500, 500, std::wstring(s.begin(), s.end()).c_str(), 12);
 
 	std::string ss = std::to_string(points[0].y);
 	ss += "-";
 	//ss += std::to_string(int(v2.z));
-	TextOut(hdc, 500, 520, std::wstring(ss.begin(), ss.end()).c_str(), 12);
+	TextOut(hdc, 1500, 520, std::wstring(ss.begin(), ss.end()).c_str(), 12);
 
 	std::string sss = std::to_string(points[0].z);
 	sss += "-";
 	//sss += std::to_string(int(v3.z));
-	TextOut(hdc, 500, 540, std::wstring(sss.begin(), sss.end()).c_str(), 12);
+	TextOut(hdc, 1500, 540, std::wstring(sss.begin(), sss.end()).c_str(), 12);
 
 	std::vector<MyColor> colors{
 								MyColor(255.f, 255.f, 255.f),
@@ -733,6 +736,10 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 		int i2 = triangles[i][1];
 		int i3 = triangles[i][2];
 
+		float w1 = w_value[triangles[i][0] - 1];
+		float w2 = w_value[triangles[i][1] - 1];
+		float w3 = w_value[triangles[i][2] - 1];
+
 		Vector3 p1 = points[triangles[i][0] - 1];
 		Vector3 p2 = points[triangles[i][1] - 1];
 		Vector3 p3 = points[triangles[i][2] - 1];
@@ -742,37 +749,50 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 		MyColor c3 = colors[triangles[i][2] - 1];
 
 		// 首先，剔除所有不在视锥体里面的
-		bool f1 = (p1.x <= -1.f or p1.x >= 1.f) or (p1.y <= -1.f or p1.y >= 1.f) or (p1.z <= -1.f);
-		bool f2 = (p2.x <= -1.f or p2.x >= 1.f) or (p2.y <= -1.f or p2.y >= 1.f) or (p2.z <= -1.f);
-		bool f3 = (p3.x <= -1.f or p3.x >= 1.f) or (p3.y <= -1.f or p3.y >= 1.f) or (p3.z <= -1.f);
+		// --------------------------------------------------------------------------------------------------------------
+		//bool f1 = (p1.z >= -w1);
+		//bool f2 = (p2.z >= -w2);
+		//bool f3 = (p3.z >= -w3);
 
+		bool f1 = (p1.x <= w1 or p1.x >= -w1) or (p1.y <= w1 or p1.y >= -w1) or (p1.z >= -w1);
+		bool f2 = (p2.x <= w2 or p2.x >= -w2) or (p2.y <= w2 or p2.y >= -w2) or (p2.z >= -w2);
+		bool f3 = (p3.x <= w3 or p3.x >= -w3) or (p3.y <= w3 or p3.y >= -w3) or (p3.z >= -w3);
 
 
 		if (f1 and f2 and f3) 
 			cute_triangles.insert(i);
 		else {
 			// 超过近平面的三角形
-			bool b1 = p1.z <= -1.f;
-			bool b2 = p2.z <= -1.f;
-			bool b3 = p3.z <= -1.f;
+			bool b1 = p1.z >= -w1;
+			bool b2 = p2.z >= -w2;
+			bool b3 = p3.z >= -w3;
 			int result = b1 + b2 + b3;
 			if (result == 0) continue;
 			else {
 				if (result == 1) {
 					cute_triangles.insert(i);
 					if (b2) {
-						std::swap(p1, p2); std::swap(i1, i2);
+						std::swap(p1, p2); 
+						std::swap(i1, i2);
+						std::swap(c1, c2);
+						std::swap(w1, w2);
 					} 
 					if (b3) {
-						std::swap(p1, p3); std::swap(i1, i3);
+						std::swap(p1, p3); 
+						std::swap(i1, i3);
+						std::swap(c1, c3);
+						std::swap(w1, w3);
 					} 
 
 					// 计算出交点和交点的颜色值
-					float t1 = (-1.f - p1.z) / (p2.z - p1.z);
-					float t2 = (-1.f - p1.z) / (p3.z - p1.z);
+					float t1 = -(p1.z + w1) / ((p2.z - p1.z) + (w2 - w1));
+					float t2 = -(p1.z + w1) / ((p3.z - p1.z) + (w3 - w1));
 
 					Vector3 ins1 = p1 + (p2 - p1) * t1;
 					Vector3 ins2 = p1 + (p3 - p1) * t2;
+
+					float wins1 = w1 + (w2 - w1) * t1;
+					float wins2 = w1 + (w3 - w1) * t2;
 
 					MyColor colr1 = (c2 - c1) * t1 + c1;
 					MyColor colr2 = (c3 - c1) * t2 + c1;
@@ -780,10 +800,12 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 					// 将新生成的点的位置和颜色信息压入
 					points.push_back(ins1);
 					colors.push_back(colr1);
+					w_value.push_back(wins1);
 					int index1 = points.size(); // 新生成的点对应的index
 
 					points.push_back(ins2);
 					colors.push_back(colr2);
+					w_value.push_back(wins2);
 					int index2 = points.size(); // 新生成的点对应的index
 
 					// 将新三角形塞入待渲染列表
@@ -793,31 +815,40 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 				else if (result == 2) {
 					cute_triangles.insert(i);
 					if (not b2) {
-						std::swap(p1, p2); 
+						std::swap(p1, p2);
 						std::swap(i1, i2);
+						std::swap(c1, c2);
+						std::swap(w1, w2);
 					}
 					if (not b3) {
-						std::swap(p1, p3); 
+						std::swap(p1, p3);
 						std::swap(i1, i3);
+						std::swap(c1, c3);
+						std::swap(w1, w3);
 					} 
 					
 					// 计算出交点和交点的颜色值
-					float t1 = (-1.f - p2.z) / (p1.z - p2.z);
-					float t2 = (-1.f - p3.z) / (p1.z - p3.z);
+					float t1 = -(p1.z + w1) / ((p2.z - p1.z) + (w2 - w1));
+					float t2 = -(p1.z + w1) / ((p3.z - p1.z) + (w3 - w1));
 
-					Vector3 ins1 = (p1 - p2) * t1 + p2;
-					Vector3 ins2 = (p1 - p3) * t2 + p3;
+					Vector3 ins1 = p1 + (p2 - p1) * t1;
+					Vector3 ins2 = p1 + (p3 - p1) * t2;
 
-					MyColor colr1 = (c1 - c2) * t1 + c2;
-					MyColor colr2 = (c1 - c3) * t2 + c3;
+					float wins1 = w1 + (w2 - w1) * t1;
+					float wins2 = w1 + (w3 - w1) * t2;
+
+					MyColor colr1 = (c2 - c1) * t1 + c1;
+					MyColor colr2 = (c3 - c1) * t2 + c1;
 
 					// 将新生成的点的位置和颜色信息压入
 					points.push_back(ins1);
 					colors.push_back(colr1);
+					w_value.push_back(wins1);
 					int index1 = points.size(); // 新生成的点对应的index
 
 					points.push_back(ins2);
 					colors.push_back(colr2);
+					w_value.push_back(wins2);
 					int index2 = points.size(); // 新生成的点对应的index
 
 					// 将新三角形塞入待渲染列表
@@ -838,7 +869,7 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 
 	// 视口变换
 	for (int i = 0; i < points.size(); i++) {
-		ViewportTransform(points[i]);
+		ViewportTransform(points[i], w_value[i]);
 		vertexes[i + 1] = ColoredVertex(points[i].x, points[i].y, points[i].z, colors[i]);
 	}
 
@@ -856,14 +887,14 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 	}
 
 	//// 标记顶点
-	//TextOut(hdc, points[0].x, points[0].y, TEXT("1"), 1);
-	//TextOut(hdc, bottom_2.x, bottom_2.y, TEXT("2"), 1);
-	//TextOut(hdc, bottom_3.x, bottom_3.y, TEXT("3"), 1);
-	//TextOut(hdc, bottom_4.x, bottom_4.y, TEXT("4"), 1);
-	//TextOut(hdc, top_1.x, top_1.y, TEXT("a"), 1);
-	//TextOut(hdc, top_2.x, top_2.y, TEXT("b"), 1);
-	//TextOut(hdc, top_3.x, top_3.y, TEXT("c"), 1);
-	//TextOut(hdc, top_4.x, top_4.y, TEXT("d"), 1);
+	TextOut(hdc, points[0].x, points[0].y, TEXT("1"), 1);
+	TextOut(hdc, points[1].x, points[0].y, TEXT("2"), 1);
+	TextOut(hdc, bottom_3.x, bottom_3.y, TEXT("3"), 1);
+	TextOut(hdc, bottom_4.x, bottom_4.y, TEXT("4"), 1);
+	TextOut(hdc, top_1.x, top_1.y, TEXT("a"), 1);
+	TextOut(hdc, top_2.x, top_2.y, TEXT("b"), 1);
+	TextOut(hdc, top_3.x, top_3.y, TEXT("c"), 1);
+	TextOut(hdc, top_4.x, top_4.y, TEXT("d"), 1);
 	
 	std::vector<Triangle> ts = std::vector<Triangle>();
 
