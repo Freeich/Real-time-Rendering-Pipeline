@@ -90,7 +90,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
         // 输出 FPS
         std::string s = std::to_string((int)fps);
-        TextOut(hdc, 1000, 100, std::wstring(s.begin(), s.end()).c_str(), 10);
+        TextOut(hdc, 1000, 100, std::wstring(s.begin(), s.end()).c_str(), 3);
 
         // 画立方体
         DrawCube(hdc, camera, Vector3(100.f, 100.f, -20.f), 200.f, 200.f, 200.f, backbuffer, z_buffer);

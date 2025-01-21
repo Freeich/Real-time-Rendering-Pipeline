@@ -12,6 +12,14 @@ const float PI = 3.14159265358979323846;
 const int width = 900;
 const int height = 900;
 
+enum class RenderState
+{
+	Counterclockwise,
+	Clockwise,
+	RenderAll
+};
+
+
 float Clamp(float value, float min, float max) {
 	if (value < min) return min;
 	if (value > max) return max;
@@ -409,7 +417,7 @@ public:
 		lookat_.y = lookat_matrix.m[1][0];
 		lookat_.z = lookat_matrix.m[2][0];
 		
-		return lookat_;
+		return lookat_.Normalize();
 	};
 };
 
@@ -449,7 +457,7 @@ public:
 //}
 
 // MVP算法
-float MVP(Vector3& point, Camera camera) {
+float MVP(Vector3& point, Camera& camera) {
 	
 	// Vector转换为Matrix方便计算
 	Matrix point_matrix = point.PointToMatrix();
@@ -524,16 +532,8 @@ float MVP(Vector3& point, Camera camera) {
 }
 
 // 视口变换
-void ViewportTransform(Vector3& point, float w) {
+void ViewportTransform(Vector3& point) {
 	Matrix point_matrix = point.PointToMatrix();
-	point_matrix.m[3][0] = w;
-
-	if (point_matrix.m[3][0] != 0.f) {
-		point_matrix.m[0][0] = point_matrix.m[0][0] / point_matrix.m[3][0];
-		point_matrix.m[1][0] = point_matrix.m[1][0] / point_matrix.m[3][0];
-		point_matrix.m[2][0] = point_matrix.m[2][0] / point_matrix.m[3][0];
-		point_matrix.m[3][0] = point_matrix.m[3][0] / point_matrix.m[3][0];
-	}
 
 	Matrix viewport_matrix(4, 4);
 	viewport_matrix.m[0][0] = width / 2;
@@ -550,6 +550,23 @@ void ViewportTransform(Vector3& point, float w) {
 	point.z = point_matrix.m[2][0];
 }
 
+// 透视除法 -> NDC
+void ProjectiveDivision(Vector3& point, float w) {
+	Matrix point_matrix = point.PointToMatrix();
+	point_matrix.m[3][0] = w;
+
+	if (point_matrix.m[3][0] != 0.f) {
+		point_matrix.m[0][0] = point_matrix.m[0][0] / point_matrix.m[3][0];
+		point_matrix.m[1][0] = point_matrix.m[1][0] / point_matrix.m[3][0];
+		point_matrix.m[2][0] = point_matrix.m[2][0] / point_matrix.m[3][0];
+		point_matrix.m[3][0] = point_matrix.m[3][0] / point_matrix.m[3][0];
+	}
+
+	point.x = point_matrix.m[0][0];
+	point.y = point_matrix.m[1][0];
+	point.z = point_matrix.m[2][0];
+}
+
 // 扫描线算法绘制单个三角形
 void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3, float* z_buffer, uint32_t* backbuffer) {
 	
@@ -557,7 +574,6 @@ void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3
 	if (p1.y < p2.y) std::swap(p1, p2);
 	if (p1.y < p3.y) std::swap(p1, p3);
 	if (p2.y < p3.y) std::swap(p2, p3);
-	
 
 	Vector3 v1 = Vector3(p1.x, p1.y, p1.z);
 	Vector3 v2 = Vector3(p2.x, p2.y, p2.z);
@@ -661,21 +677,64 @@ void Render(HDC& hdc, const std::vector<Triangle>& triangles, uint32_t* backbuff
 }
 
 
+// 三角形背面剔除
+std::vector<std::vector<int>> RemoveBackTriangles(Camera& camera, std::vector<std::vector<int>> triangles, std::vector<Vector3>& points, RenderState renderstate = RenderState::Counterclockwise) {
+	
+	Vector3 lookdir = camera.GetLookat();
+
+	std::vector<std::vector<int>> new_triangles = std::vector<std::vector<int>>();
+
+	for (int i = 0; i < triangles.size(); i++) {
+		Vector3 b1 = points[triangles[i][1] - 1] - points[triangles[i][0] - 1];
+		Vector3 b2 = points[triangles[i][2] - 1] - points[triangles[i][0] - 1];
+		Vector3 n = b1.Normalize().CrossProduct(b2.Normalize()).Normalize();
+
+		
+		switch (renderstate)
+		{
+		case RenderState::Counterclockwise:
+
+			if (lookdir.DotProduct(n) < 0) {
+				new_triangles.push_back(triangles[i]);
+			}
+			break;
+
+		case RenderState::Clockwise:
+
+			if (lookdir.DotProduct(n) > 0) {
+				new_triangles.push_back(triangles[i]);
+			}
+			break;
+
+		case RenderState::RenderAll:
+
+			new_triangles.push_back(triangles[i]);
+
+			break;
+		default:
+			break;
+		}
+	}
+	return new_triangles;
+}
+
+
+
 // 画立方体线框
-void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length, float width, float height, uint32_t* backbuffer, float* z_buffer) {
+void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, float width, float height, uint32_t* backbuffer, float* z_buffer) {
 	
 	std::vector<std::vector<int>> triangles = {
 	{1, 2, 3},
-	{1, 4, 3},
-	{2, 3, 7},
+	{1, 3, 4},
+	{2, 7, 3},
 	{2, 6, 7},
 	{4, 3, 7},
-	{4, 8, 7},
+	{4, 7, 8},
 	{1, 4, 8},
-	{1, 5, 8},
-	{1, 2, 6},
+	{1, 8, 5},
+	{1, 6, 2},
 	{1, 5, 6},
-	{5, 6, 7},
+	{5, 7, 6},
 	{5, 8, 7} };
 	
 	Vector3 bottom_1 = start;
@@ -726,7 +785,7 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 								MyColor(0.f, 0.f, 255.f) };
 	
 	// 需要剔除的三角形序号集合
-	std::unordered_set<int> cute_triangles = std::unordered_set<int>();
+	std::unordered_set<int> cut_triangles = std::unordered_set<int>();
 
 	// 用现在的坐标进行视锥剔除和三角形裁剪
 	int triangles_num = triangles.size();
@@ -760,7 +819,7 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 
 
 		if (f1 and f2 and f3) 
-			cute_triangles.insert(i);
+			cut_triangles.insert(i);
 		else {
 			// 超过近平面的三角形
 			bool b1 = p1.z >= -w1;
@@ -770,7 +829,7 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 			if (result == 0) continue;
 			else {
 				if (result == 1) {
-					cute_triangles.insert(i);
+					cut_triangles.insert(i);
 					if (b2) {
 						std::swap(p1, p2); 
 						std::swap(i1, i2);
@@ -813,7 +872,7 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 					triangles.push_back({ i3, index1, index2 });
 				}
 				else if (result == 2) {
-					cute_triangles.insert(i);
+					cut_triangles.insert(i);
 					if (not b2) {
 						std::swap(p1, p2);
 						std::swap(i1, i2);
@@ -862,14 +921,22 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 
 	// 剔除不需要的三角形
 	for (int i = 0; i < triangles.size();i++) {
-		if (cute_triangles.count(i) == 0) new_triangles.push_back(triangles[i]);
+		if (cut_triangles.count(i) == 0) new_triangles.push_back(triangles[i]);
 	}
 
 	std::unordered_map<int, ColoredVertex> vertexes = std::unordered_map<int, ColoredVertex>();
 
+	// 透视除法
+	for (int i = 0; i < points.size(); i++) {
+		ProjectiveDivision(points[i], w_value[i]);
+	}
+
+	// 背面裁剪
+	new_triangles = RemoveBackTriangles(camera, new_triangles, points, RenderState::Counterclockwise);
+
 	// 视口变换
 	for (int i = 0; i < points.size(); i++) {
-		ViewportTransform(points[i], w_value[i]);
+		ViewportTransform(points[i]);
 		vertexes[i + 1] = ColoredVertex(points[i].x, points[i].y, points[i].z, colors[i]);
 	}
 
@@ -880,21 +947,21 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 
 	// 画边框
 	//DrawLine(hdc, bottom_1, bottom_2);
-	for (int i = 0; i < new_triangles.size(); i++) {
-		DrawLine(hdc, points[new_triangles[i][0] - 1], points[new_triangles[i][1] - 1]);
-		DrawLine(hdc, points[new_triangles[i][1] - 1], points[new_triangles[i][2] - 1]);
-		DrawLine(hdc, points[new_triangles[i][2] - 1], points[new_triangles[i][0] - 1]);
-	}
+	//for (int i = 0; i < new_triangles.size(); i++) {
+	//	DrawLine(hdc, points[new_triangles[i][0] - 1], points[new_triangles[i][1] - 1]);
+	//	DrawLine(hdc, points[new_triangles[i][1] - 1], points[new_triangles[i][2] - 1]);
+	//	DrawLine(hdc, points[new_triangles[i][2] - 1], points[new_triangles[i][0] - 1]);
+	//}
 
 	//// 标记顶点
-	TextOut(hdc, points[0].x, points[0].y, TEXT("1"), 1);
-	TextOut(hdc, points[1].x, points[0].y, TEXT("2"), 1);
-	TextOut(hdc, bottom_3.x, bottom_3.y, TEXT("3"), 1);
-	TextOut(hdc, bottom_4.x, bottom_4.y, TEXT("4"), 1);
-	TextOut(hdc, top_1.x, top_1.y, TEXT("a"), 1);
-	TextOut(hdc, top_2.x, top_2.y, TEXT("b"), 1);
-	TextOut(hdc, top_3.x, top_3.y, TEXT("c"), 1);
-	TextOut(hdc, top_4.x, top_4.y, TEXT("d"), 1);
+	//TextOut(hdc, points[0].x, points[0].y, TEXT("1"), 1);
+	//TextOut(hdc, points[1].x, points[0].y, TEXT("2"), 1);
+	//TextOut(hdc, bottom_3.x, bottom_3.y, TEXT("3"), 1);
+	//TextOut(hdc, bottom_4.x, bottom_4.y, TEXT("4"), 1);
+	//TextOut(hdc, top_1.x, top_1.y, TEXT("a"), 1);
+	//TextOut(hdc, top_2.x, top_2.y, TEXT("b"), 1);
+	//TextOut(hdc, top_3.x, top_3.y, TEXT("c"), 1);
+	//TextOut(hdc, top_4.x, top_4.y, TEXT("d"), 1);
 	
 	std::vector<Triangle> ts = std::vector<Triangle>();
 
@@ -903,6 +970,11 @@ void DrawCube(HDC& hdc, const Camera& camera, const Vector3& start, float length
 		Triangle t = Triangle(vertexes[new_triangles[i][0]], vertexes[new_triangles[i][1]], vertexes[new_triangles[i][2]]);
 		ts.push_back(t);
 	}
+
+	// 查看渲染三角形的个数
+	std::string render_info = "Number Of Triangles: ";
+	render_info += std::to_string(new_triangles.size());
+	TextOut(hdc, 1000, 150, std::wstring(render_info.begin(), render_info.end()).c_str(), 23);
 	
 	// 渲染操作
 	Render(hdc, ts, backbuffer, z_buffer);
