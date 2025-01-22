@@ -218,6 +218,16 @@ public:
 		return Vector3(k * x, k * y, k * z);
 	}
 
+	// 相等
+	bool operator==(const Vector3& vector_sec) {
+		return x == vector_sec.x and y == vector_sec.y and z == vector_sec.z;
+	}
+
+	// 不相等
+	bool operator!=(const Vector3& vector_sec) {
+		return !(x == vector_sec.x and y == vector_sec.y and z == vector_sec.z);
+	}
+
 	float length() {
 		return sqrt(x * x + y * y + z * z);
 	}
@@ -413,11 +423,12 @@ public:
 		Matrix lookat_m = lookat_.VectorToMatrix();
 		Matrix lookat_matrix = pitch_rotate * yaw_rotate * roll_rotate * lookat_m;
 
-		lookat_.x = lookat_matrix.m[0][0];
-		lookat_.y = lookat_matrix.m[1][0];
-		lookat_.z = lookat_matrix.m[2][0];
+		//lookat_.x = lookat_matrix.m[0][0];
+		//lookat_.y = lookat_matrix.m[1][0];
+		//lookat_.z = lookat_matrix.m[2][0];
+		Vector3 la = Vector3(lookat_matrix.m[0][0], lookat_matrix.m[1][0], lookat_matrix.m[2][0]);
 		
-		return lookat_.Normalize();
+		return la.Normalize();
 	};
 };
 
@@ -506,8 +517,8 @@ float MVP(Vector3& point, Camera& camera) {
 	Matrix pers_proj(4, 4);
 
 	// 投影变换
-	float z_near = -0.1f;
-	float z_far = -1000.f;
+	float z_near = -0.5f;
+	float z_far = -500.f;
 
 	pers_proj.m[0][0] = z_near / 1.f;
 	pers_proj.m[1][1] = z_near / 1.f;
@@ -626,7 +637,7 @@ void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3
 
 		// 画每一条扫描线的pixel
 		float total_width = end.x - start.x;
-		for (float j = 0; j <= total_width; j++) {
+		for (float j = 0; j < total_width; j++) {
 			MyColor color = (color_end - color_start) * (j / total_width) + color_start;
 			Vector3 point = (end - start) * (j / total_width) + start;
 			int x = (int)point.x;
@@ -688,6 +699,7 @@ std::vector<std::vector<int>> RemoveBackTriangles(Camera& camera, std::vector<st
 		Vector3 b1 = points[triangles[i][1] - 1] - points[triangles[i][0] - 1];
 		Vector3 b2 = points[triangles[i][2] - 1] - points[triangles[i][0] - 1];
 		Vector3 n = b1.Normalize().CrossProduct(b2.Normalize()).Normalize();
+		n = n * (-1); // 因为窗口的左上角才是原点，y轴被倒置，所以法线向量应该取反。
 
 		
 		switch (renderstate)
@@ -830,17 +842,20 @@ void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, floa
 			else {
 				if (result == 1) {
 					cut_triangles.insert(i);
+					bool inverse = false;
 					if (b2) {
 						std::swap(p1, p2); 
 						std::swap(i1, i2);
 						std::swap(c1, c2);
 						std::swap(w1, w2);
+						inverse = true;
 					} 
 					if (b3) {
 						std::swap(p1, p3); 
 						std::swap(i1, i3);
 						std::swap(c1, c3);
 						std::swap(w1, w3);
+						inverse = true;
 					} 
 
 					// 计算出交点和交点的颜色值
@@ -867,23 +882,56 @@ void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, floa
 					w_value.push_back(wins2);
 					int index2 = points.size(); // 新生成的点对应的index
 
+
+					Vector3 bo1 = points[i2] - points[i1];
+					Vector3 bo2 = points[i3] - points[i1];
+					Vector3 n1 = bo1.Normalize().CrossProduct(bo2.Normalize()).Normalize();
+
+					Vector3 bn1 = points[i3] - points[i1];
+					Vector3 bn2 = points[index1] - points[i1];
+					Vector3 n2 = bn1.Normalize().CrossProduct(bn2.Normalize()).Normalize();
+
 					// 将新三角形塞入待渲染列表
-					triangles.push_back({ i2, i3, index1 });
-					triangles.push_back({ i3, index1, index2 });
+					// 现在逻辑是对的，但是想反了--------------------------------------------(待看)-------------------------------------
+					if (inverse) {
+						if (n1 == n2) {
+							triangles.push_back({ i2, i3, index1 });
+							triangles.push_back({ i3, index2, index1 });
+						}
+						else {
+							triangles.push_back({ i3, i2, index1 });
+							triangles.push_back({ i3, index1, index2 });
+						}
+					}
+					else {
+						if (n1 != n2) {
+							triangles.push_back({ i2, i3, index1 });
+							triangles.push_back({ i3, index2, index1 });
+						}
+						else {
+							triangles.push_back({ i3, i2, index1 });
+							triangles.push_back({ i3, index1, index2 });
+						}
+					}
+					//triangles.push_back({ i2, i3, index1 });
+					//triangles.push_back({ i3, index2, index1 });
 				}
 				else if (result == 2) {
 					cut_triangles.insert(i);
+					bool inverse = false;
 					if (not b2) {
 						std::swap(p1, p2);
 						std::swap(i1, i2);
 						std::swap(c1, c2);
 						std::swap(w1, w2);
+						inverse = true;
 					}
 					if (not b3) {
 						std::swap(p1, p3);
 						std::swap(i1, i3);
 						std::swap(c1, c3);
 						std::swap(w1, w3);
+						inverse = true;
 					} 
 					
 					// 计算出交点和交点的颜色值
@@ -911,7 +959,12 @@ void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, floa
 					int index2 = points.size(); // 新生成的点对应的index
 
 					// 将新三角形塞入待渲染列表
-					triangles.push_back({ i1, index1, index2 });
+					if (inverse) {
+						triangles.push_back({ i1, index2, index1 });
+					}
+					else {
+						triangles.push_back({ i1, index1, index2 });
+					}
 				}
 			}
 		}
