@@ -829,7 +829,6 @@ std::vector<std::vector<int>> CuteTriangles(
 						triangles.push_back({ i2, i3, index1 });
 						triangles.push_back({ i3, index2, index1 });
 					}
-
 					//triangles.push_back({ i2, i3, index1 });
 					//triangles.push_back({ i3, index2, index1 });
 				}
@@ -898,9 +897,10 @@ std::vector<std::vector<int>> CuteTriangles(
 }
 
 // 施加光照
-void AddIllumination(std::vector<std::vector<int>>& triangles, std::vector<Vector3>& points, std::vector<MyColor>& colors) {
+void AddIllumination(Camera& camera, std::vector<std::vector<int>>& triangles, std::vector<Vector3>& points, std::vector<MyColor>& colors, Vector3 light_dir) {
 
-	Vector3 light_dir = Vector3(1, -1, -1).Normalize();
+	//Vector3 light_dir = Vector3(-1, 1, -1).Normalize();
+	Vector3 lookat = camera.GetLookat().Normalize();
 
 	for (int i = 0; i < points.size(); i++) {
 		std::vector<int> relative_triagnles = std::vector<int>();
@@ -911,15 +911,48 @@ void AddIllumination(std::vector<std::vector<int>>& triangles, std::vector<Vecto
 			}
 		}
 
-		for (int j = 0; j < relative_triagnles.size(); j++) {
+		std::vector<std::pair<Vector3, float>> normals = std::vector<std::pair<Vector3, float>>();
+		float area_all = 0.f;
+		for (int index : relative_triagnles) {
+			Vector3 b1 = points[triangles[index][1] - 1] - points[triangles[index][0] - 1];
+			Vector3 b2 = points[triangles[index][2] - 1] - points[triangles[index][0] - 1];
+			Vector3 n1 = b1.Normalize().CrossProduct(b2.Normalize()).Normalize();
+			n1 = n1 * (-1);
 			
+			// 计算三角形的面积，通过面积算顶点法线的加权平均值
+			float area = b1.CrossProduct(b2).length() / 2;
+			area_all = area_all + area;
+
+			normals.push_back(std::make_pair(n1, area));
 		}
+
+		if (area_all == 0) continue;
+
+		// 计算顶点的加权法线
+		Vector3 normal_avg = Vector3();
+		for (std::pair<Vector3, float>& n : normals) {
+			normal_avg = normal_avg + n.first * (n.second / area_all);
+		}
+
+		normal_avg = normal_avg.Normalize();
+
+		float Intensity = 1.f;
+
+		// 计算光照：根据光照信息重新上色。
+		MyColor light_diffuse = colors[i] * max(0, normal_avg.DotProduct(light_dir * -1)) * Intensity;
+		MyColor light_specular = MyColor(255, 255, 255) * std::pow(max(0, ((light_dir * (-1) - lookat).Normalize()).DotProduct(light_dir * -1)), 256) * Intensity;
+		MyColor light_ambient = colors[i] * 0.05f;
+
+		colors[i] = light_diffuse + light_specular + light_ambient;
+		colors[i].r = Clamp(colors[i].r, 0.f, 255.f);
+		colors[i].g = Clamp(colors[i].g, 0.f, 255.f);
+		colors[i].b = Clamp(colors[i].b, 0.f, 255.f);
 	}
 
 }
 
 // 画立方体线框
-void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, float width, float height, uint32_t* backbuffer, float* z_buffer) {
+void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, float width, float height, uint32_t* backbuffer, float* z_buffer, Vector3& light_dir) {
 	
 	std::vector<std::vector<int>> triangles = {
 	{1, 2, 3},
@@ -957,11 +990,12 @@ void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, floa
 							MyColor(0.f, 0.f, 0.f),
 							MyColor(0.f, 0.f, 255.f) };
 
+	
+	light_dir.x += 0.001f;
+	//light_dir.y += 0.01f;
+
 	// 施加光照
-	AddIllumination(triangles, points, colors);
-
-
-
+	AddIllumination(camera, triangles, points, colors, light_dir.Normalize());
 
 	// MVP变换
 	for (int i = 0; i < points.size(); i++) {
@@ -992,7 +1026,7 @@ void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, floa
 	}
 
 	// 背面裁剪
-	new_triangles = RemoveBackTriangles(camera, new_triangles, points, RenderState::Counterclockwise);
+	new_triangles = RemoveBackTriangles(camera, new_triangles, points, RenderState::RenderAll);
 
 	// 视口变换
 	for (int i = 0; i < points.size(); i++) {

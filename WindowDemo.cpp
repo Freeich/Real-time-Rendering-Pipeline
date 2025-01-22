@@ -61,6 +61,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     // SwapBuffer
     uint32_t* backbuffer = new uint32_t[width * height];
 
+    // 光照方向
+    Vector3 light_dir = Vector3(-1, 1, -1);
+
     // 主消息循环: peekmessage
     while (running) {
         if(PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
@@ -92,9 +95,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         std::string s = std::to_string((int)fps);
         TextOut(hdc, 1000, 100, std::wstring(s.begin(), s.end()).c_str(), 3);
 
+        
 
         // 画立方体
-        DrawCube(hdc, camera, Vector3(10.f, 10.f, -100.f), 50.f, 50.f, 50.f, backbuffer, z_buffer);
+        DrawCube(hdc, camera, Vector3(10.f, 10.f, -100.f), 50.f, 50.f, 50.f, backbuffer, z_buffer, light_dir);
         
         // 重置backbuffer和zbuffer
         for (int i = 0; i < width * height; i++) {
