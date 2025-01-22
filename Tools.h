@@ -733,7 +733,7 @@ std::vector<std::vector<int>> RemoveBackTriangles(Camera& camera, std::vector<st
 
 // 三角形裁剪
 std::vector<std::vector<int>> CuteTriangles(
-	std::vector<std::vector<int>> triangles, 
+	std::vector<std::vector<int>>& triangles, 
 	std::vector<Vector3>& points, 
 	std::vector<float>& w_value, 
 	std::vector<MyColor>& colors) {
@@ -820,37 +820,16 @@ std::vector<std::vector<int>> CuteTriangles(
 					w_value.push_back(wins2);
 					int index2 = points.size(); // 新生成的点对应的index
 
-
-					Vector3 bo1 = points[i2] - points[i1];
-					Vector3 bo2 = points[i3] - points[i1];
-					Vector3 n1 = bo1.Normalize().CrossProduct(bo2.Normalize()).Normalize();
-
-					Vector3 bn1 = points[i3] - points[i1];
-					Vector3 bn2 = points[index1] - points[i1];
-					Vector3 n2 = bn1.Normalize().CrossProduct(bn2.Normalize()).Normalize();
-
 					// 将新三角形塞入待渲染列表
-					// 现在逻辑是对的，但是想反了--------------------------------------------(待看)-------------------------------------
 					if (inverse) {
-						if (n1 == n2) {
-							triangles.push_back({ i2, i3, index1 });
-							triangles.push_back({ i3, index2, index1 });
-						}
-						else {
-							triangles.push_back({ i3, i2, index1 });
-							triangles.push_back({ i3, index1, index2 });
-						}
+						triangles.push_back({ i3, i2, index1 });
+						triangles.push_back({ i3, index1, index2 });
 					}
 					else {
-						if (n1 != n2) {
-							triangles.push_back({ i2, i3, index1 });
-							triangles.push_back({ i3, index2, index1 });
-						}
-						else {
-							triangles.push_back({ i3, i2, index1 });
-							triangles.push_back({ i3, index1, index2 });
-						}
+						triangles.push_back({ i2, i3, index1 });
+						triangles.push_back({ i3, index2, index1 });
 					}
+
 					//triangles.push_back({ i2, i3, index1 });
 					//triangles.push_back({ i3, index2, index1 });
 				}
@@ -918,6 +897,27 @@ std::vector<std::vector<int>> CuteTriangles(
 	return new_triangles;
 }
 
+// 施加光照
+void AddIllumination(std::vector<std::vector<int>>& triangles, std::vector<Vector3>& points, std::vector<MyColor>& colors) {
+
+	Vector3 light_dir = Vector3(1, -1, -1).Normalize();
+
+	for (int i = 0; i < points.size(); i++) {
+		std::vector<int> relative_triagnles = std::vector<int>();
+		for (int j = 0; j < triangles.size(); j++) {
+			// 如果这个三角形包含这个顶点
+			if (triangles[j][0] == i + 1 or triangles[j][1] == i + 1 or triangles[j][2] == i + 1) {
+				relative_triagnles.push_back(j);
+			}
+		}
+
+		for (int j = 0; j < relative_triagnles.size(); j++) {
+			
+		}
+	}
+
+}
+
 // 画立方体线框
 void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, float width, float height, uint32_t* backbuffer, float* z_buffer) {
 	
@@ -957,6 +957,12 @@ void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, floa
 							MyColor(0.f, 0.f, 0.f),
 							MyColor(0.f, 0.f, 255.f) };
 
+	// 施加光照
+	AddIllumination(triangles, points, colors);
+
+
+
+
 	// MVP变换
 	for (int i = 0; i < points.size(); i++) {
 		w_value.push_back(MVP(points[i], camera));
@@ -978,9 +984,7 @@ void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, floa
 	// 基于视锥的三角形裁剪：只实现了基于近裁面的裁剪
 	std::vector<std::vector<int>> new_triangles = std::vector<std::vector<int>>();
 	new_triangles = CuteTriangles(triangles, points, w_value, colors);
-
-	// 信息顶点集合
-	std::unordered_map<int, ColoredVertex> vertexes = std::unordered_map<int, ColoredVertex>();
+	
 
 	// 透视除法
 	for (int i = 0; i < points.size(); i++) {
@@ -993,10 +997,10 @@ void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, floa
 	// 视口变换
 	for (int i = 0; i < points.size(); i++) {
 		ViewportTransform(points[i]);
-		vertexes[i + 1] = ColoredVertex(points[i].x, points[i].y, points[i].z, colors[i]);
 	}
 
 	// 将顶点改为颜色顶点
+	std::unordered_map<int, ColoredVertex> vertexes = std::unordered_map<int, ColoredVertex>();
 	for (int i = 0; i < points.size(); i++) {
 		vertexes[i + 1] = ColoredVertex(points[i].x, points[i].y, points[i].z, colors[i]);
 	}
