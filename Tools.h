@@ -467,6 +467,7 @@ public:
 //	point.z = point_matrix.m[2][0];
 //}
 
+
 // MVP算法
 float MVP(Vector3& point, Camera& camera) {
 	
@@ -730,72 +731,13 @@ std::vector<std::vector<int>> RemoveBackTriangles(Camera& camera, std::vector<st
 	return new_triangles;
 }
 
+// 三角形裁剪
+std::vector<std::vector<int>> CuteTriangles(
+	std::vector<std::vector<int>> triangles, 
+	std::vector<Vector3>& points, 
+	std::vector<float>& w_value, 
+	std::vector<MyColor>& colors) {
 
-
-// 画立方体线框
-void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, float width, float height, uint32_t* backbuffer, float* z_buffer) {
-	
-	std::vector<std::vector<int>> triangles = {
-	{1, 2, 3},
-	{1, 3, 4},
-	{2, 7, 3},
-	{2, 6, 7},
-	{4, 3, 7},
-	{4, 7, 8},
-	{1, 4, 8},
-	{1, 8, 5},
-	{1, 6, 2},
-	{1, 5, 6},
-	{5, 7, 6},
-	{5, 8, 7} };
-	
-	Vector3 bottom_1 = start;
-	Vector3 bottom_2(bottom_1.x + length, bottom_1.y, bottom_1.z);
-	Vector3 bottom_3(bottom_1.x + length, bottom_1.y, bottom_1.z - width);
-	Vector3 bottom_4(bottom_1.x, bottom_1.y, bottom_1.z - width);
-	Vector3 top_1(bottom_1.x, bottom_1.y + height, bottom_1.z);
-	Vector3 top_2(bottom_2.x, bottom_2.y + height, bottom_2.z);
-	Vector3 top_3(bottom_3.x, bottom_3.y + height, bottom_3.z);
-	Vector3 top_4(bottom_4.x, bottom_4.y + height, bottom_4.z);
-
-	// 视角变换
-	float w_1 = MVP(bottom_1, camera);
-	float w_2 = MVP(bottom_2, camera);
-	float w_3 = MVP(bottom_3, camera);
-	float w_4 = MVP(bottom_4, camera);
-	float w_5 = MVP(top_1, camera);
-	float w_6 = MVP(top_2, camera);
-	float w_7 = MVP(top_3, camera);
-	float w_8 = MVP(top_4, camera);
-
-	std::vector<float> w_value = { w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8 };
-	std::vector<Vector3> points = { bottom_1, bottom_2, bottom_3, bottom_4, top_1, top_2, top_3, top_4 };
-
-	std::string s = std::to_string(points[0].x);
-	s += "-";
-	//s += std::to_string(int(v1.z));
-	TextOut(hdc, 1500, 500, std::wstring(s.begin(), s.end()).c_str(), 12);
-
-	std::string ss = std::to_string(points[0].y);
-	ss += "-";
-	//ss += std::to_string(int(v2.z));
-	TextOut(hdc, 1500, 520, std::wstring(ss.begin(), ss.end()).c_str(), 12);
-
-	std::string sss = std::to_string(points[0].z);
-	sss += "-";
-	//sss += std::to_string(int(v3.z));
-	TextOut(hdc, 1500, 540, std::wstring(sss.begin(), sss.end()).c_str(), 12);
-
-	std::vector<MyColor> colors{
-								MyColor(255.f, 255.f, 255.f),
-								MyColor(255.f, 255.f, 0.f),
-								MyColor(255.f, 0.f, 0.f),
-								MyColor(255.f, 0.f, 255.f),
-								MyColor(0.f, 255.f, 255.f),
-								MyColor(0.f, 255.f, 0.f),
-								MyColor(0.f, 0.f, 0.f),
-								MyColor(0.f, 0.f, 255.f) };
-	
 	// 需要剔除的三角形序号集合
 	std::unordered_set<int> cut_triangles = std::unordered_set<int>();
 
@@ -820,17 +762,13 @@ void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, floa
 		MyColor c3 = colors[triangles[i][2] - 1];
 
 		// 首先，剔除所有不在视锥体里面的
-		// --------------------------------------------------------------------------------------------------------------
-		//bool f1 = (p1.z >= -w1);
-		//bool f2 = (p2.z >= -w2);
-		//bool f3 = (p3.z >= -w3);
 
 		bool f1 = (p1.x <= w1 or p1.x >= -w1) or (p1.y <= w1 or p1.y >= -w1) or (p1.z >= -w1);
 		bool f2 = (p2.x <= w2 or p2.x >= -w2) or (p2.y <= w2 or p2.y >= -w2) or (p2.z >= -w2);
 		bool f3 = (p3.x <= w3 or p3.x >= -w3) or (p3.y <= w3 or p3.y >= -w3) or (p3.z >= -w3);
 
 
-		if (f1 and f2 and f3) 
+		if (f1 and f2 and f3)
 			cut_triangles.insert(i);
 		else {
 			// 超过近平面的三角形
@@ -844,19 +782,19 @@ void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, floa
 					cut_triangles.insert(i);
 					bool inverse = false;
 					if (b2) {
-						std::swap(p1, p2); 
+						std::swap(p1, p2);
 						std::swap(i1, i2);
 						std::swap(c1, c2);
 						std::swap(w1, w2);
 						inverse = true;
-					} 
+					}
 					if (b3) {
-						std::swap(p1, p3); 
+						std::swap(p1, p3);
 						std::swap(i1, i3);
 						std::swap(c1, c3);
 						std::swap(w1, w3);
 						inverse = true;
-					} 
+					}
 
 					// 计算出交点和交点的颜色值
 					float t1 = -(p1.z + w1) / ((p2.z - p1.z) + (w2 - w1));
@@ -932,8 +870,8 @@ void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, floa
 						std::swap(c1, c3);
 						std::swap(w1, w3);
 						inverse = true;
-					} 
-					
+					}
+
 					// 计算出交点和交点的颜色值
 					float t1 = -(p1.z + w1) / ((p2.z - p1.z) + (w2 - w1));
 					float t2 = -(p1.z + w1) / ((p3.z - p1.z) + (w3 - w1));
@@ -973,10 +911,75 @@ void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, floa
 	std::vector<std::vector<int>> new_triangles = std::vector<std::vector<int>>();
 
 	// 剔除不需要的三角形
-	for (int i = 0; i < triangles.size();i++) {
+	for (int i = 0; i < triangles.size(); i++) {
 		if (cut_triangles.count(i) == 0) new_triangles.push_back(triangles[i]);
 	}
 
+	return new_triangles;
+}
+
+// 画立方体线框
+void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, float width, float height, uint32_t* backbuffer, float* z_buffer) {
+	
+	std::vector<std::vector<int>> triangles = {
+	{1, 2, 3},
+	{1, 3, 4},
+	{2, 7, 3},
+	{2, 6, 7},
+	{4, 3, 7},
+	{4, 7, 8},
+	{1, 4, 8},
+	{1, 8, 5},
+	{1, 6, 2},
+	{1, 5, 6},
+	{5, 7, 6},
+	{5, 8, 7} };
+	
+	Vector3 bottom_1 = start;
+	Vector3 bottom_2(bottom_1.x + length, bottom_1.y, bottom_1.z);
+	Vector3 bottom_3(bottom_1.x + length, bottom_1.y, bottom_1.z - width);
+	Vector3 bottom_4(bottom_1.x, bottom_1.y, bottom_1.z - width);
+	Vector3 top_1(bottom_1.x, bottom_1.y + height, bottom_1.z);
+	Vector3 top_2(bottom_2.x, bottom_2.y + height, bottom_2.z);
+	Vector3 top_3(bottom_3.x, bottom_3.y + height, bottom_3.z);
+	Vector3 top_4(bottom_4.x, bottom_4.y + height, bottom_4.z);
+
+	
+	std::vector<Vector3> points = { bottom_1, bottom_2, bottom_3, bottom_4, top_1, top_2, top_3, top_4 };
+	std::vector<float> w_value = {};
+	std::vector<MyColor> colors{
+							MyColor(255.f, 255.f, 255.f),
+							MyColor(255.f, 255.f, 0.f),
+							MyColor(255.f, 0.f, 0.f),
+							MyColor(255.f, 0.f, 255.f),
+							MyColor(0.f, 255.f, 255.f),
+							MyColor(0.f, 255.f, 0.f),
+							MyColor(0.f, 0.f, 0.f),
+							MyColor(0.f, 0.f, 255.f) };
+
+	// MVP变换
+	for (int i = 0; i < points.size(); i++) {
+		w_value.push_back(MVP(points[i], camera));
+	}
+
+	//std::string s = std::to_string(points[0].x);
+	//s += "-";
+	////s += std::to_string(int(v1.z));
+	//TextOut(hdc, 1500, 500, std::wstring(s.begin(), s.end()).c_str(), 12);
+	//std::string ss = std::to_string(points[0].y);
+	//ss += "-";
+	////ss += std::to_string(int(v2.z));
+	//TextOut(hdc, 1500, 520, std::wstring(ss.begin(), ss.end()).c_str(), 12);
+	//std::string sss = std::to_string(points[0].z);
+	//sss += "-";
+	////sss += std::to_string(int(v3.z));
+	//TextOut(hdc, 1500, 540, std::wstring(sss.begin(), sss.end()).c_str(), 12);
+
+	// 基于视锥的三角形裁剪：只实现了基于近裁面的裁剪
+	std::vector<std::vector<int>> new_triangles = std::vector<std::vector<int>>();
+	new_triangles = CuteTriangles(triangles, points, w_value, colors);
+
+	// 信息顶点集合
 	std::unordered_map<int, ColoredVertex> vertexes = std::unordered_map<int, ColoredVertex>();
 
 	// 透视除法
