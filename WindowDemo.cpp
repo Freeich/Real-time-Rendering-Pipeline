@@ -4,6 +4,8 @@
 #include "framework.h"
 #include "WindowDemo.h"
 #include <iostream>
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
 #include <cmath>
 #include "Tools.h"
 #include <windowsx.h>
@@ -55,17 +57,28 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     MSG msg;
     bool running = true;
     
+    // 读取obj文件
+    std::string inputfile = "can.obj";
+
+    // tinyobjloader 数据结构
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+    std::string warn, err;
+    // 加载 .obj 文件
+    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, inputfile.c_str());
+
     // Z-Buffer
     float* z_buffer = (float*)calloc(width * height, sizeof(float));
 
     // SwapBuffer
     uint32_t* backbuffer = new uint32_t[width * height];
 
-    // 读取文件
+    // 读取材质贴图
     int img_width = 0;
     int img_height = 0;
     int channels = 0;
-    unsigned char* material_data = stbi_load("sq1.jpg", &img_width, &img_height, &channels, 0);
+    unsigned char* material_data = stbi_load("sq5.jpg", &img_width, &img_height, &channels, 0);
 
     // 光照方向
     Vector3 light_dir = Vector3(-1, 1, -1);
@@ -93,18 +106,19 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         float frame_time = elapsedTime.count();
         float fps = 1.0f / frame_time;
 
+        // 适配不同帧率的匀速相机控制
         //translate_step = 100.f * frame_time;
         //roate_step = 5.f * frame_time;
-        
 
         // 输出 FPS
         std::string s = std::to_string((int)fps);
         TextOut(hdc, 1000, 100, std::wstring(s.begin(), s.end()).c_str(), 3);
 
-        
+        // 渲染立方体
+        RenderCube(hdc, camera, Vector3(0.f, 0.f, -200.f), 50.f, 50.f, 50.f, backbuffer, z_buffer, light_dir, material_data, img_width, img_height);
 
-        // 画立方体
-        DrawCube(hdc, camera, Vector3(10.f, 10.f, -100.f), 200.f, 200.f, 200.f, backbuffer, z_buffer, light_dir, material_data, img_width, img_height);
+        // 渲染obj文件
+        //Draw(hdc, camera, backbuffer, z_buffer,  material_data, img_width, img_height, attrib, shapes);
         
         // 重置backbuffer和zbuffer
         for (int i = 0; i < width * height; i++) {
@@ -283,30 +297,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
             // TODO: 在此处添加使用 hdc 的任何绘图代码...
-            //TextOut(hdc, 50, 50, L"Hello, Windows!", 15);
-            //MoveToEx(hdc, 50, 50, NULL);
-            //LineTo(hdc, 200, 200);
-
-            /*DrawLine(hdc, Vector2(800, 900), Vector2(1920, 900));
-            Matrix mm = Matrix();
-            mm.m[1][0] = 2.f;
-            mm.m[1][1] = 2.f;
-            mm.m[1][2] = 2.f;
-            mm.m[1][3] = 2.f;
-
-            Matrix mm1 = Matrix();
-            mm1.m[0][1] = 1.f;
-            mm1.m[1][1] = 1.f;
-            mm1.m[2][1] = 1.f;
-            mm1.m[3][1] = 1.f;
-
-            Matrix mm2 = mm * mm1;
-
-            mm2.print(hdc);*/
-
-            //DrawCube(hdc, Vector3(100.f, 100.f, -100.f), 100.f, 100.f, 100.f);
-
-
             EndPaint(hWnd, &ps);
         }
         break;
