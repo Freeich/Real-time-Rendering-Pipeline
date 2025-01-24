@@ -61,6 +61,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     // SwapBuffer
     uint32_t* backbuffer = new uint32_t[width * height];
 
+    // 读取文件
+    int img_width = 0;
+    int img_height = 0;
+    int channels = 0;
+    unsigned char* material_data = stbi_load("sq1.jpg", &img_width, &img_height, &channels, 0);
+
     // 光照方向
     Vector3 light_dir = Vector3(-1, 1, -1);
 
@@ -98,7 +104,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         
 
         // 画立方体
-        DrawCube(hdc, camera, Vector3(10.f, 10.f, -100.f), 50.f, 50.f, 50.f, backbuffer, z_buffer, light_dir);
+        DrawCube(hdc, camera, Vector3(10.f, 10.f, -100.f), 200.f, 200.f, 200.f, backbuffer, z_buffer, light_dir, material_data, img_width, img_height);
         
         // 重置backbuffer和zbuffer
         for (int i = 0; i < width * height; i++) {
@@ -112,6 +118,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     // 释放堆内存
     free(z_buffer);
     delete backbuffer;
+    stbi_image_free(material_data);
     return (int) msg.wParam;
 
 }
@@ -218,11 +225,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         switch (wParam)
         {
             case 'a':
-                camera.location_.x -= translate_step;
+                camera.location_.x += translate_step;
                 break;
 
             case 'd':
-                camera.location_.x += translate_step;
+                camera.location_.x -= translate_step;
                 break;
 
             case 'w':
@@ -231,6 +238,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             case 's':
                 camera.location_.z -= translate_step;
+                break;
+
+            case 'q':
+                camera.location_.y += translate_step;
+                break;
+
+            case 'e':
+                camera.location_.y -= translate_step;
                 break;
 
             default:

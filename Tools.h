@@ -7,6 +7,9 @@
 #include <map>
 #include <unordered_map>
 #include <unordered_set>
+#define STB_IMAGE_IMPLEMENTATION  //必须加上
+#include "stb_image.h"
+
 
 const float PI = 3.14159265358979323846;
 const int width = 900;
@@ -18,7 +21,6 @@ enum class RenderState
 	Clockwise,
 	RenderAll
 };
-
 
 float Clamp(float value, float min, float max) {
 	if (value < min) return min;
@@ -66,40 +68,6 @@ struct MyColor {
 	}
 
 };
-struct ColoredVertex
-{
-	float x;
-	float y;
-	float z;
-	MyColor c = MyColor();
-
-	ColoredVertex() {};
-	ColoredVertex(float xx, float yy, float zz, MyColor cc): x(xx), y(yy), z(zz), c(cc) {};
-
-	// 手动定义赋值运算符
-	ColoredVertex& operator=(const ColoredVertex& other) {
-		if (this != &other) { // 防止自我赋值
-			x = other.x;
-			y = other.y;
-			z = other.z;
-			c = other.c;
-		}
-		return *this;
-	}
-
-};
-
-
-
-struct Triangle {
-	ColoredVertex v1;
-	ColoredVertex v2;
-	ColoredVertex v3;
-
-	Triangle() {};
-	Triangle(ColoredVertex v11, ColoredVertex v22, ColoredVertex v33) : v1(v11), v2(v22), v3(v33) {};
-};
-
 
 
 class Matrix {
@@ -310,6 +278,45 @@ public:
 };
 
 
+struct VertexInfo
+{
+	float x;
+	float y;
+	float z;
+	float w = 0.01f;
+	MyColor c = MyColor();
+	Vector2 uv_coor = Vector2();
+	Vector3 normal_vector = Vector3();
+	Vector3 world_position = Vector3();
+
+	VertexInfo() {};
+	VertexInfo(float xx, float yy, float zz) : x(xx), y(yy), z(zz) {};
+
+	// 手动定义赋值运算符
+	VertexInfo& operator=(const VertexInfo& other) {
+		if (this != &other) { // 防止自我赋值
+			x = other.x;
+			y = other.y;
+			z = other.z;
+			c = other.c;
+			uv_coor = other.uv_coor;
+			normal_vector = other.normal_vector;
+		}
+		return *this;
+	}
+
+};
+
+struct Triangle {
+	VertexInfo v1;
+	VertexInfo v2;
+	VertexInfo v3;
+
+	Triangle() {};
+	Triangle(VertexInfo v11, VertexInfo v22, VertexInfo v33) : v1(v11), v2(v22), v3(v33) {};
+};
+
+
 // DDA画线
 void DrawLine(HDC hdc, const Vector2& v1, const Vector2& v2) {
 	int x_len = v2.x - v1.x;
@@ -467,6 +474,28 @@ public:
 //	point.z = point_matrix.m[2][0];
 //}
 
+// 读取材质颜色
+MyColor ReadMatiral(unsigned char* material_data, const Vector2& uv, int img_width, int img_height) {
+	int channels = 3;
+
+	float u = uv.x;
+	float v = uv.y;
+
+	int x = round(u * img_width - 1);
+	int y = round(v * img_height - 1);
+
+	int index = (y * img_width + x) * channels;
+	float r = (float)material_data[index + 0];
+	float g = (float)material_data[index + 1];
+	float b = (float)material_data[index + 2];
+
+	MyColor color = MyColor();
+	color.r = r;
+	color.g = g;
+	color.b = b;
+
+	return color;
+}
 
 // MVP算法
 float MVP(Vector3& point, Camera& camera) {
@@ -580,7 +609,7 @@ void ProjectiveDivision(Vector3& point, float w) {
 }
 
 // 扫描线算法绘制单个三角形
-void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3, float* z_buffer, uint32_t* backbuffer) {
+void DraaawTriangle(HDC& hdc, VertexInfo p1, VertexInfo p2, VertexInfo p3, float* z_buffer, uint32_t* backbuffer) {
 	
 	// 首先确保三个坐标顺序
 	if (p1.y < p2.y) std::swap(p1, p2);
@@ -590,6 +619,7 @@ void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3
 	Vector3 v1 = Vector3(p1.x, p1.y, p1.z);
 	Vector3 v2 = Vector3(p2.x, p2.y, p2.z);
 	Vector3 v3 = Vector3(p3.x, p3.y, p3.z);
+
 	MyColor c1 = p1.c;
 	MyColor c2 = p2.c;
 	MyColor c3 = p3.c;
@@ -621,13 +651,16 @@ void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3
 		MyColor color_start = (c1 - c3) * (i / total_height) + c3;
 		MyColor color_end;
 
+		float t1 = 0.f;
 		if (i <= down_height) {
-			end = (v2 - v3) * (i / down_height) + v3;
-			color_end = (c2 - c3) * (i / down_height) + c3;
+			t1 = i / down_height;
+			end = (v2 - v3) * t1 + v3;
+			color_end = (c2 - c3) * t1 + c3;
 		}
 		else {
-			end = (v1 - v2) * ((i - down_height) / up_height) + v2;
-			color_end = (c1 - c2) * ((i - down_height) / up_height) + c2;
+			t1 = (i - down_height) / up_height;
+			end = (v1 - v2) * t1 + v2;
+			color_end = (c1 - c2) * t1 + c2;
 		}
 
 		// 确保start在左边
@@ -639,8 +672,9 @@ void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3
 		// 画每一条扫描线的pixel
 		float total_width = end.x - start.x;
 		for (float j = 0; j < total_width; j++) {
-			MyColor color = (color_end - color_start) * (j / total_width) + color_start;
-			Vector3 point = (end - start) * (j / total_width) + start;
+			float t2 = j / total_width;
+			MyColor color = (color_end - color_start) * t2 + color_start;
+			Vector3 point = (end - start) * t2 + start;
 			int x = (int)point.x;
 			int y = (int)point.y;
 			float z = point.z;
@@ -664,13 +698,138 @@ void DrawTriangle(HDC& hdc, ColoredVertex p1, ColoredVertex p2, ColoredVertex p3
 	}
 }
 
+void DrawTriangle(HDC& hdc, Camera& camera, VertexInfo p1, VertexInfo p2, VertexInfo p3, float* z_buffer, uint32_t* backbuffer, unsigned char* material_data, int img_width, int img_height) {
+
+	// 光照方向
+	Vector3 light_dir = Vector3(-1, 1, -1).Normalize();
+
+	// 首先确保三个坐标顺序
+	if (p1.y < p2.y) std::swap(p1, p2);
+	if (p1.y < p3.y) std::swap(p1, p3);
+	if (p2.y < p3.y) std::swap(p2, p3);
+
+	Vector3 v1 = Vector3(p1.x, p1.y, p1.z);
+	Vector3 v2 = Vector3(p2.x, p2.y, p2.z);
+	Vector3 v3 = Vector3(p3.x, p3.y, p3.z);
+
+	float total_height = v1.y - v3.y;
+	float down_height = v2.y - v3.y;
+	float up_height = v1.y - v2.y;
+	
+	for (float i = 0; i <= total_height; i++) {
+		// 确定每条扫描线的起始位置
+		Vector3 start = (v1 - v3) * (i / total_height) + v3;
+		if (start.y > 900.f) break;
+		Vector3 end;
+
+		float t1 = 0.f;
+		if (i <= down_height) {
+			t1 = i / down_height;
+			end = (v2 - v3) * t1 + v3;
+		}
+		else {
+			t1 = (i - down_height) / up_height;
+			end = (v1 - v2) * t1 + v2;
+		}
+
+		// 确保start在左边
+		if (start.x > end.x) {
+			std::swap(start, end);
+		}
+
+		// 画每一条扫描线的pixel
+		float total_width = end.x - start.x;
+		for (float j = start.x; j <= end.x; j++) {
+			
+			// 当前着色点的坐标
+			float x = j;
+			float y = i + v3.y;
+
+			if (x > 900.f) break;
+
+			// 重心坐标系数
+			float a = (-(x - v2.x) * (v3.y - v2.y) + (y - v2.y) * (v3.x - v2.x)) / (-(v1.x - v2.x) * (v3.y - v2.y) + (v1.y - v2.y) * (v3.x - v2.x));
+			float b = (-(x - v3.x) * (v1.y - v3.y) + (y - v3.y) * (v1.x - v3.x)) / (-(v2.x - v3.x) * (v1.y - v3.y) + (v2.y - v3.y) * (v1.x - v3.x));
+			float c = 1 - a - b;
+			
+			if (not (a >= 0 and b >= 0 and c >= 0)) continue;
+			
+			// 进行透视矫正，并插值计算各个值
+			float w1 = p1.w;
+			float w2 = p2.w;
+			float w3 = p3.w;
+			float w_inverse = (1 / w1) * a + (1 / w2) * b + (1 / w3) * c;
+
+			// 利用世界空间坐标计算 施加高光时需要的视角方向
+			Vector3 wp1 = p1.world_position * (1 / w1);
+			Vector3 wp2 = p2.world_position * (1 / w2);
+			Vector3 wp3 = p3.world_position * (1 / w3);
+			Vector3 wp = wp1 * a + wp2 * b + wp3 * c;
+			wp = wp * (1 / w_inverse);
+			Vector3 v = (wp - camera.GetLocation()).Normalize();
+
+			Vector2 uv1 = p1.uv_coor * (1 / w1);
+			Vector2 uv2 = p2.uv_coor * (1 / w2);
+			Vector2 uv3 = p3.uv_coor * (1 / w3);
+			Vector2 uv = uv1 * a + uv2 * b + uv3 * c;
+			uv = uv * (1 / w_inverse);
+
+			Vector3 normal1 = p1.normal_vector * (1 / w1);
+			Vector3 normal2 = p2.normal_vector * (1 / w2);
+			Vector3 normal3 = p3.normal_vector * (1 / w3);
+			Vector3 normal = normal1 * a + normal2 * b + normal3 * c;
+			normal = (normal * (1 / w_inverse)).Normalize();
+			
+			
+			float z_depth = p1.z * a + p2.z * b + p3.z * c;
+
+			int key = int(y) * width + int(x);
+
+			if (x < 900.f and x > 0.f and y < 900.f and y > 0.f) {
+				if (z_buffer[key] == 0.f or (z_buffer[key] != 0.f and z_depth < z_buffer[key])) {
+					z_buffer[key] = z_depth;
+					
+					// 读取材质贴图信息
+					MyColor color = ReadMatiral(material_data, uv, img_width, img_height);
+
+					// 施加光照
+					float Intensity = 1.0f;
+
+					// 计算光照：根据光照信息重新上色。
+					MyColor light_diffuse = color * max(0, normal.DotProduct(light_dir * -1)) * Intensity;
+					MyColor light_specular = MyColor(255, 255, 255) * pow(max(0, ((light_dir * (-1) - v).Normalize()).DotProduct(normal)), 256) * Intensity;
+					MyColor light_ambient = color * 0.2f;
+
+					color = light_diffuse + light_specular + light_ambient;
+					color.r = Clamp(color.r, 0.f, 255.f);
+					color.g = Clamp(color.g, 0.f, 255.f);
+					color.b = Clamp(color.b, 0.f, 255.f);
+					
+					// 存储像素信息到backbuffer
+					uint32_t red = static_cast<uint32_t>(color.r);
+					uint32_t green = static_cast<uint32_t>(color.g);
+					uint32_t blue = static_cast<uint32_t>(color.b);
+					uint32_t alpha = 0xff;
+					backbuffer[key] = alpha << 24 | red << 16 | green << 8 | blue;
+
+
+					//SetPixelV(hdc, x, y, RGB(color.r, color.g, color.b));
+				}
+
+			}
+		}
+
+	}
+}
+
+
 
 // 传递三角信息
-void Render(HDC& hdc, const std::vector<Triangle>& triangles, uint32_t* backbuffer, float* z_buffer) {
+void Render(HDC& hdc, Camera& camera, const std::vector<Triangle>& triangles, uint32_t* backbuffer, float* z_buffer, unsigned char* material_data, int img_width, int img_height) {
 
 	// 给每个三角形进行线性插值上色
 	for (Triangle t : triangles) {
-		DrawTriangle(hdc, t.v1, t.v2, t.v3, z_buffer, backbuffer);
+		DrawTriangle(hdc, camera, t.v1, t.v2, t.v3, z_buffer, backbuffer, material_data, img_width, img_height);
 	}
 
 	BITMAPINFO bmi = { 0 };
@@ -690,7 +849,7 @@ void Render(HDC& hdc, const std::vector<Triangle>& triangles, uint32_t* backbuff
 
 
 // 三角形背面剔除
-std::vector<std::vector<int>> RemoveBackTriangles(Camera& camera, std::vector<std::vector<int>> triangles, std::vector<Vector3>& points, RenderState renderstate = RenderState::Counterclockwise) {
+std::vector<std::vector<int>> RemoveBackTriangles(Camera& camera, std::vector<std::vector<int>> triangles, std::vector<Vector3>& points, RenderState renderstate = RenderState::RenderAll) {
 	
 	Vector3 lookdir = camera.GetLookat();
 
@@ -736,7 +895,9 @@ std::vector<std::vector<int>> CuteTriangles(
 	std::vector<std::vector<int>>& triangles, 
 	std::vector<Vector3>& points, 
 	std::vector<float>& w_value, 
-	std::vector<MyColor>& colors) {
+	std::vector<Vector2>& uv_coordinate,
+	std::vector<Vector3>& normal_vectors,
+	std::vector<Vector3>& world_positions) {
 
 	// 需要剔除的三角形序号集合
 	std::unordered_set<int> cut_triangles = std::unordered_set<int>();
@@ -757,9 +918,18 @@ std::vector<std::vector<int>> CuteTriangles(
 		Vector3 p2 = points[triangles[i][1] - 1];
 		Vector3 p3 = points[triangles[i][2] - 1];
 
-		MyColor c1 = colors[triangles[i][0] - 1];
-		MyColor c2 = colors[triangles[i][1] - 1];
-		MyColor c3 = colors[triangles[i][2] - 1];
+		Vector2 uv1 = uv_coordinate[triangles[i][0] - 1];
+		Vector2 uv2 = uv_coordinate[triangles[i][1] - 1];
+		Vector2 uv3 = uv_coordinate[triangles[i][2] - 1];
+
+		Vector3 normal1 = normal_vectors[triangles[i][0] - 1];
+		Vector3 normal2 = normal_vectors[triangles[i][1] - 1];
+		Vector3 normal3 = normal_vectors[triangles[i][2] - 1];
+
+		Vector3 wp1 = world_positions[triangles[i][0] - 1];
+		Vector3 wp2 = world_positions[triangles[i][1] - 1];
+		Vector3 wp3 = world_positions[triangles[i][2] - 1];
+
 
 		// 首先，剔除所有不在视锥体里面的
 
@@ -784,15 +954,19 @@ std::vector<std::vector<int>> CuteTriangles(
 					if (b2) {
 						std::swap(p1, p2);
 						std::swap(i1, i2);
-						std::swap(c1, c2);
 						std::swap(w1, w2);
+						std::swap(uv1, uv2);
+						std::swap(normal1, normal2);
+						std::swap(wp1, wp2);
 						inverse = true;
 					}
 					if (b3) {
 						std::swap(p1, p3);
 						std::swap(i1, i3);
-						std::swap(c1, c3);
 						std::swap(w1, w3);
+						std::swap(uv1, uv3);
+						std::swap(normal1, normal3);
+						std::swap(wp1, wp3);
 						inverse = true;
 					}
 
@@ -806,18 +980,28 @@ std::vector<std::vector<int>> CuteTriangles(
 					float wins1 = w1 + (w2 - w1) * t1;
 					float wins2 = w1 + (w3 - w1) * t2;
 
-					MyColor colr1 = (c2 - c1) * t1 + c1;
-					MyColor colr2 = (c3 - c1) * t2 + c1;
+					Vector2 uv_ins1 = uv1 + (uv2 - uv1) * t1;
+					Vector2 uv_ins2 = uv2 + (uv3 - uv1) * t2;
+
+					Vector3 normal_ins1 = normal1 + (normal2 - normal1) * t1;
+					Vector3 normal_ins2 = normal1 + (normal3 - normal1) * t2;
+
+					Vector3 wp_ins1 = wp1 + (wp2 - wp1) * t1;
+					Vector3 wp_ins2 = wp1 + (wp3 - wp1) * t2;
 
 					// 将新生成的点的位置和颜色信息压入
 					points.push_back(ins1);
-					colors.push_back(colr1);
 					w_value.push_back(wins1);
+					uv_coordinate.push_back(uv_ins1);
+					normal_vectors.push_back(normal_ins1);
+					world_positions.push_back(wp_ins1);
 					int index1 = points.size(); // 新生成的点对应的index
 
 					points.push_back(ins2);
-					colors.push_back(colr2);
 					w_value.push_back(wins2);
+					uv_coordinate.push_back(uv_ins2);
+					normal_vectors.push_back(normal_ins2);
+					world_positions.push_back(wp_ins2);
 					int index2 = points.size(); // 新生成的点对应的index
 
 					// 将新三角形塞入待渲染列表
@@ -838,15 +1022,19 @@ std::vector<std::vector<int>> CuteTriangles(
 					if (not b2) {
 						std::swap(p1, p2);
 						std::swap(i1, i2);
-						std::swap(c1, c2);
 						std::swap(w1, w2);
+						std::swap(uv1, uv2);
+						std::swap(normal1, normal2);
+						std::swap(wp1, wp2);
 						inverse = true;
 					}
 					if (not b3) {
 						std::swap(p1, p3);
 						std::swap(i1, i3);
-						std::swap(c1, c3);
 						std::swap(w1, w3);
+						std::swap(uv1, uv3);
+						std::swap(normal1, normal3);
+						std::swap(wp1, wp3);
 						inverse = true;
 					}
 
@@ -860,18 +1048,28 @@ std::vector<std::vector<int>> CuteTriangles(
 					float wins1 = w1 + (w2 - w1) * t1;
 					float wins2 = w1 + (w3 - w1) * t2;
 
-					MyColor colr1 = (c2 - c1) * t1 + c1;
-					MyColor colr2 = (c3 - c1) * t2 + c1;
+					Vector2 uv_ins1 = uv1 + (uv2 - uv1) * t1;
+					Vector2 uv_ins2 = uv2 + (uv3 - uv1) * t2;
+
+					Vector3 normal_ins1 = normal1 + (normal2 - normal1) * t1;
+					Vector3 normal_ins2 = normal1 + (normal3 - normal1) * t2;
+
+					Vector3 wp_ins1 = wp1 + (wp2 - wp1) * t1;
+					Vector3 wp_ins2 = wp1 + (wp3 - wp1) * t2;
 
 					// 将新生成的点的位置和颜色信息压入
 					points.push_back(ins1);
-					colors.push_back(colr1);
 					w_value.push_back(wins1);
+					uv_coordinate.push_back(uv_ins1);
+					normal_vectors.push_back(normal_ins1);
+					world_positions.push_back(wp_ins1);
 					int index1 = points.size(); // 新生成的点对应的index
 
 					points.push_back(ins2);
-					colors.push_back(colr2);
 					w_value.push_back(wins2);
+					uv_coordinate.push_back(uv_ins2);
+					normal_vectors.push_back(normal_ins2);
+					world_positions.push_back(wp_ins2);
 					int index2 = points.size(); // 新生成的点对应的index
 
 					// 将新三角形塞入待渲染列表
@@ -896,7 +1094,7 @@ std::vector<std::vector<int>> CuteTriangles(
 	return new_triangles;
 }
 
-// 施加光照
+// 施加光照(废弃)
 void AddIllumination(Camera& camera, std::vector<std::vector<int>>& triangles, std::vector<Vector3>& points, std::vector<MyColor>& colors, Vector3 light_dir) {
 
 	//Vector3 light_dir = Vector3(-1, 1, -1).Normalize();
@@ -936,12 +1134,12 @@ void AddIllumination(Camera& camera, std::vector<std::vector<int>>& triangles, s
 
 		normal_avg = normal_avg.Normalize();
 
-		float Intensity = 1.f;
+		float Intensity = 2.0f;
 
 		// 计算光照：根据光照信息重新上色。
 		MyColor light_diffuse = colors[i] * max(0, normal_avg.DotProduct(light_dir * -1)) * Intensity;
-		MyColor light_specular = MyColor(255, 255, 255) * std::pow(max(0, ((light_dir * (-1) - lookat).Normalize()).DotProduct(light_dir * -1)), 256) * Intensity;
-		MyColor light_ambient = colors[i] * 0.05f;
+		MyColor light_specular = MyColor(50, 50, 50) * std::pow(max(0, ((light_dir * (-1) - lookat).Normalize()).DotProduct(light_dir * -1)), 256) * Intensity;
+		MyColor light_ambient = colors[i] * 0.2f;
 
 		colors[i] = light_diffuse + light_specular + light_ambient;
 		colors[i].r = Clamp(colors[i].r, 0.f, 255.f);
@@ -952,7 +1150,7 @@ void AddIllumination(Camera& camera, std::vector<std::vector<int>>& triangles, s
 }
 
 // 画立方体线框
-void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, float width, float height, uint32_t* backbuffer, float* z_buffer, Vector3& light_dir) {
+void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, float width, float height, uint32_t* backbuffer, float* z_buffer, Vector3& light_dir, unsigned char* material_data, int img_width, int img_height) {
 	
 	std::vector<std::vector<int>> triangles = {
 	{1, 2, 3},
@@ -976,10 +1174,24 @@ void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, floa
 	Vector3 top_2(bottom_2.x, bottom_2.y + height, bottom_2.z);
 	Vector3 top_3(bottom_3.x, bottom_3.y + height, bottom_3.z);
 	Vector3 top_4(bottom_4.x, bottom_4.y + height, bottom_4.z);
-
 	
 	std::vector<Vector3> points = { bottom_1, bottom_2, bottom_3, bottom_4, top_1, top_2, top_3, top_4 };
+	
+	std::vector<Vector3> world_positions = { bottom_1, bottom_2, bottom_3, bottom_4, top_1, top_2, top_3, top_4 };
+
 	std::vector<float> w_value = {};
+	
+	std::vector<Vector2> uv_coordinate{
+		{0.001f, 0.001f},
+		{0.333f, 0.001f},
+		{0.666f, 0.001f},
+		{0.999f, 0.001f},
+		{0.001f, 0.333f},
+		{0.333f, 0.333f},
+		{0.666f, 0.333f},
+		{0.999f, 0.333f}
+	};
+	
 	std::vector<MyColor> colors{
 							MyColor(255.f, 255.f, 255.f),
 							MyColor(255.f, 255.f, 0.f),
@@ -989,13 +1201,45 @@ void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, floa
 							MyColor(0.f, 255.f, 0.f),
 							MyColor(0.f, 0.f, 0.f),
 							MyColor(0.f, 0.f, 255.f) };
-
 	
-	light_dir.x += 0.001f;
-	//light_dir.y += 0.01f;
+	std::vector<Vector3> normal_vectors = std::vector<Vector3>(8);
 
-	// 施加光照
-	AddIllumination(camera, triangles, points, colors, light_dir.Normalize());
+	for (int i = 0; i < points.size(); i++) {
+		std::vector<int> relative_triagnles = std::vector<int>();
+		for (int j = 0; j < triangles.size(); j++) {
+			// 如果这个三角形包含这个顶点
+			if (triangles[j][0] == i + 1 or triangles[j][1] == i + 1 or triangles[j][2] == i + 1) {
+				relative_triagnles.push_back(j);
+			}
+		}
+
+		std::vector<std::pair<Vector3, float>> normals = std::vector<std::pair<Vector3, float>>();
+		float area_all = 0.f;
+		for (int index : relative_triagnles) {
+			Vector3 b1 = points[triangles[index][1] - 1] - points[triangles[index][0] - 1];
+			Vector3 b2 = points[triangles[index][2] - 1] - points[triangles[index][0] - 1];
+			Vector3 n1 = b1.Normalize().CrossProduct(b2.Normalize()).Normalize();
+			n1 = n1 * (-1);
+
+			// 计算三角形的面积，通过面积算顶点法线的加权平均值
+			float area = b1.CrossProduct(b2).length() / 2;
+			area_all = area_all + area;
+
+			normals.push_back(std::make_pair(n1, area));
+		}
+
+		if (area_all == 0) continue;
+
+		// 计算顶点的加权法线
+		Vector3 normal_avg = Vector3();
+		for (std::pair<Vector3, float>& n : normals) {
+			normal_avg = normal_avg + n.first * (n.second / area_all);
+		}
+
+		normal_avg = normal_avg.Normalize();
+
+		normal_vectors[i] = normal_avg;
+	}
 
 	// MVP变换
 	for (int i = 0; i < points.size(); i++) {
@@ -1017,7 +1261,7 @@ void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, floa
 
 	// 基于视锥的三角形裁剪：只实现了基于近裁面的裁剪
 	std::vector<std::vector<int>> new_triangles = std::vector<std::vector<int>>();
-	new_triangles = CuteTriangles(triangles, points, w_value, colors);
+	new_triangles = CuteTriangles(triangles, points, w_value, uv_coordinate, normal_vectors, world_positions);
 	
 
 	// 透视除法
@@ -1034,9 +1278,13 @@ void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, floa
 	}
 
 	// 将顶点改为颜色顶点
-	std::unordered_map<int, ColoredVertex> vertexes = std::unordered_map<int, ColoredVertex>();
+	std::unordered_map<int, VertexInfo> vertexes = std::unordered_map<int, VertexInfo>();
 	for (int i = 0; i < points.size(); i++) {
-		vertexes[i + 1] = ColoredVertex(points[i].x, points[i].y, points[i].z, colors[i]);
+		vertexes[i + 1] = VertexInfo(points[i].x, points[i].y, points[i].z);
+		vertexes[i + 1].normal_vector = normal_vectors[i];
+		vertexes[i + 1].uv_coor = uv_coordinate[i];
+		vertexes[i + 1].w = w_value[i];
+		vertexes[i + 1].world_position = world_positions[i];
 	}
 
 	// 画边框
@@ -1048,7 +1296,7 @@ void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, floa
 	//}
 
 	//// 标记顶点
-	//TextOut(hdc, points[0].x, points[0].y, TEXT("1"), 1);
+	TextOut(hdc, points[0].x, points[0].y, TEXT("1"), 1);
 	//TextOut(hdc, points[1].x, points[0].y, TEXT("2"), 1);
 	//TextOut(hdc, bottom_3.x, bottom_3.y, TEXT("3"), 1);
 	//TextOut(hdc, bottom_4.x, bottom_4.y, TEXT("4"), 1);
@@ -1071,7 +1319,7 @@ void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, floa
 	TextOut(hdc, 1000, 150, std::wstring(render_info.begin(), render_info.end()).c_str(), 23);
 	
 	// 渲染操作
-	Render(hdc, ts, backbuffer, z_buffer);
+	Render(hdc, camera, ts, backbuffer, z_buffer, material_data, img_width, img_height);
 }
 
 void tick() {}
