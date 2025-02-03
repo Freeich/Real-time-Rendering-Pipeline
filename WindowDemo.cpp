@@ -9,7 +9,7 @@
 #include <cmath>
 #include "Tools.h"
 #include <windowsx.h>
-#include <chrono>
+#include <chrono> 
 
 
 #define MAX_LOADSTRING 100
@@ -134,7 +134,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     delete backbuffer;
     stbi_image_free(material_data);
     return (int) msg.wParam;
-
 }
 
 

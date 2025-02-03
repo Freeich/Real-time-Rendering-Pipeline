@@ -1051,7 +1051,7 @@ std::vector<std::vector<int>> CuteTriangles(
 
 
 // 画立方体
-void DrawCube(HDC& hdc, Camera& camera, const Vector3& start, float length, float width, float height, uint32_t* backbuffer, float* z_buffer, Vector3& light_dir, unsigned char* material_data, int img_width, int img_height) {
+void RenderCube(HDC& hdc, Camera& camera, const Vector3& start, float length, float width, float height, uint32_t* backbuffer, float* z_buffer, Vector3& light_dir, unsigned char* material_data, int img_width, int img_height) {
 	
 	std::vector<std::vector<int>> triangles = {
 	{1, 2, 3},
