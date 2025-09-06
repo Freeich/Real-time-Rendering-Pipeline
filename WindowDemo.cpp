@@ -9,7 +9,7 @@
 #include <cmath>
 #include "Tools.h"
 #include <windowsx.h>
-#include <chrono> 
+#include <chrono>
 
 
 #define MAX_LOADSTRING 100
@@ -19,7 +19,7 @@ HINSTANCE hInst;                                // 当前实例
 WCHAR szTitle[MAX_LOADSTRING];                  // 标题栏文本
 WCHAR szWindowClass[MAX_LOADSTRING];            // 主窗口类名
 
-Camera camera = Camera(); // 创建全局相机
+Camera camera = Camera(Vector3(0.f, 30.f, 50.f)); // 创建全局相机
 float translate_step = 10.f;
 float roate_step = 3.f;
 
@@ -58,7 +58,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     bool running = true;
     
     // 读取obj文件
-    std::string inputfile = "can.obj";
+    std::string inputfile = "SM_Chair_Internal.obj";
 
     // tinyobjloader 数据结构
     tinyobj::attrib_t attrib;
@@ -67,6 +67,104 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     std::string warn, err;
     // 加载 .obj 文件
     bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, inputfile.c_str());
+
+    std::vector<std::vector<int>> triangles{};
+
+    std::vector<Vector3> points = {};
+
+    std::vector<Vector3> world_positions = {};
+
+    std::vector<Vector2> uv_coordinate = std::vector<Vector2>();
+
+    std::vector<Vector3> normal_vectors = std::vector<Vector3>();
+    
+    std::vector<std::vector<int>> triangles1{};
+
+    std::vector<Vector3> points1 = {};
+
+    std::vector<Vector3> world_positions1 = {};
+
+    std::vector<Vector2> uv_coordinate1 = std::vector<Vector2>();
+
+    std::vector<Vector3> normal_vectors1 = std::vector<Vector3>();
+
+    // 处理顶点数据
+    for (size_t i = 0; i < attrib.vertices.size() / 3; i++) {
+        Vector3 point = { attrib.vertices[3 * i + 0], attrib.vertices[3 * i + 1], attrib.vertices[3 * i + 2] };
+        points1.push_back(point);
+        world_positions1.push_back(point);
+    }
+
+    // 处理纹理坐标数据
+    for (size_t i = 0; i < attrib.texcoords.size() / 2; i++) {
+        Vector2 uv = { attrib.texcoords[2 * i + 0], attrib.texcoords[2 * i + 1] };
+        uv_coordinate1.push_back(uv);
+    }
+
+    // 处理法向量数据
+    // 法线向量要取反：因为目前整个管线都是用自建的cube来创建的，自行创建的cube各个三角形的法线向量与obj文件是反的，所以貌似整个管线都是反着算的。
+    for (size_t i = 0; i < attrib.normals.size() / 3; i++) {
+        Vector3 normal = { attrib.normals[3 * i + 0], attrib.normals[3 * i + 1], attrib.normals[3 * i + 2] };
+        normal_vectors1.push_back(normal);
+    }
+
+    vertexes.reserve(1000000);
+
+    // 投影变换矩阵
+    float z_near = -1.f;
+    float z_far = -500.f;
+
+    pers_proj.m[0][0] = z_near / 1.f;
+    pers_proj.m[1][1] = z_near / 1.f;
+    pers_proj.m[2][2] = (z_near + z_far) / (z_far - z_near);
+    pers_proj.m[2][3] = -1 * (2 * z_near * z_far) / (z_far - z_near);
+    pers_proj.m[3][2] = 1.f;
+    
+    std::unordered_map<int, int> had_indices = std::unordered_map<int, int>();
+    
+    // 遍历每个形状，提取三角形的顶点索引
+    for (const auto& shape : shapes) {
+        size_t index_offset = 0;
+
+        for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
+            int face_vertices = shape.mesh.num_face_vertices[f]; // 每个面的顶点数量（应该始终是 3）
+
+            if (face_vertices != 3) {
+                std::cerr << "Non-triangular face detected, skipping!" << std::endl;
+                index_offset += face_vertices;
+                continue;
+            }
+
+            std::vector<int> triangle; // 三角形的顶点索引
+
+            for (size_t v = 0; v < 3; v++) {
+                tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
+
+                // 顶点索引
+                int vertex_index = idx.vertex_index;
+
+                // 存入顶点信息
+                if(had_indices.count(idx.vertex_index))
+                {
+                    triangle.push_back(had_indices[idx.vertex_index]);
+                }
+                else
+                {
+                    points.push_back(points1[idx.vertex_index]);
+                    had_indices[idx.vertex_index] = points.size();
+                    world_positions.push_back(points1[idx.vertex_index]);
+                    idx.texcoord_index == -1 ? uv_coordinate.push_back({0.01, 0.01}) : uv_coordinate.push_back(uv_coordinate1[idx.texcoord_index]);;
+                    // uv_coordinate.push_back(uv_coordinate1[idx.texcoord_index]);
+                    normal_vectors.push_back(normal_vectors1[idx.normal_index]);
+
+                    triangle.push_back(points.size());
+                }
+            }
+
+            triangles.push_back(triangle);
+            index_offset += face_vertices;
+        }
+    }
 
     // Z-Buffer
     float* z_buffer = (float*)calloc(width * height, sizeof(float));
@@ -78,7 +176,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     int img_width = 0;
     int img_height = 0;
     int channels = 0;
-    unsigned char* material_data = stbi_load("sq5.jpg", &img_width, &img_height, &channels, 0);
+    unsigned char* material_data = stbi_load("sq3.jpg", &img_width, &img_height, &channels, 0);
 
     // 光照方向
     Vector3 light_dir = Vector3(-1, 1, -1);
@@ -115,10 +213,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         TextOut(hdc, 1000, 100, std::wstring(s.begin(), s.end()).c_str(), 3);
 
         // 渲染立方体
-        RenderCube(hdc, camera, Vector3(0.f, 0.f, -200.f), 50.f, 50.f, 50.f, backbuffer, z_buffer, light_dir, material_data, img_width, img_height);
+        // RenderCube(hdc, camera, Vector3(0.f, 0.f, -200.f), 50.f, 50.f, 50.f, backbuffer, z_buffer, light_dir, material_data, img_width, img_height);
 
         // 渲染obj文件
-        //Draw(hdc, camera, backbuffer, z_buffer,  material_data, img_width, img_height, attrib, shapes);
+        Draw(hdc, camera, backbuffer, z_buffer,  material_data, img_width, img_height, points, world_positions, uv_coordinate, normal_vectors, triangles);
         
         // 重置backbuffer和zbuffer
         for (int i = 0; i < width * height; i++) {
@@ -134,6 +232,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     delete backbuffer;
     stbi_image_free(material_data);
     return (int) msg.wParam;
+
 }
 
 
@@ -239,27 +338,33 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
             case 'a':
                 camera.location_.x += translate_step;
+                camera.CalculateMatrix();
                 break;
 
             case 'd':
                 camera.location_.x -= translate_step;
+                camera.CalculateMatrix();
                 break;
 
             case 'w':
                 camera.location_.z += translate_step;
+                camera.CalculateMatrix();
                 break;
 
             case 's':
                 camera.location_.z -= translate_step;
+                camera.CalculateMatrix();
                 break;
 
             case 'q':
                 camera.location_.y += translate_step;
+                camera.CalculateMatrix();
                 break;
 
             case 'e':
                 camera.location_.y -= translate_step;
-                break;
+                camera.CalculateMatrix();
+            break;
 
             default:
                 break;
@@ -272,18 +377,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
             case VK_LEFT:
                 camera.pitch_ -= roate_step;
+                camera.UpdateLookat();
+                camera.CalculateMatrix();
                 break;
 
             case VK_RIGHT:
                 camera.pitch_ += roate_step;
+                camera.UpdateLookat();
+                camera.CalculateMatrix();
                 break;
 
             case VK_UP:
-                camera.roll_ = camera.roll_ - roate_step;
+                camera.roll_ -= roate_step;
+                camera.UpdateLookat();
+                camera.CalculateMatrix();
                 break;
 
             case VK_DOWN:
-                camera.roll_ = camera.roll_ + roate_step;
+                camera.roll_ += roate_step;
+                camera.UpdateLookat();
+                camera.CalculateMatrix();
                 break;
 
             default:

@@ -182,7 +182,7 @@ public:
 	}
 
 	// 数乘
-	Vector3 operator*(float k) {
+	Vector3 operator*(float k) const{
 		return Vector3(k * x, k * y, k * z);
 	}
 
@@ -268,21 +268,24 @@ public:
 	}
 
 	// 数乘
-	Vector2 operator*(float k) {
+	Vector2 operator*(float k) const{
 		return Vector2(k * x, k * y);
 	}
 
 	float length() {
 		return sqrt(x * x + y * y);
 	}
+
+	bool CrossProduct(Vector2& vn)
+	{
+		return x * vn.y - y * vn.x;
+	}
 };
 
 
 struct VertexInfo
 {
-	float x;
-	float y;
-	float z;
+	Vector3 point = Vector3(0.f, 0.f, 0.f);
 	float w = 0.01f;
 	MyColor c = MyColor();
 	Vector2 uv_coor = Vector2();
@@ -290,14 +293,12 @@ struct VertexInfo
 	Vector3 world_position = Vector3();
 
 	VertexInfo() {};
-	VertexInfo(float xx, float yy, float zz) : x(xx), y(yy), z(zz) {};
+	VertexInfo(float xx, float yy, float zz) : point(Vector3(xx, yy, zz)) {};
 
 	// 手动定义赋值运算符
 	VertexInfo& operator=(const VertexInfo& other) {
 		if (this != &other) { // 防止自我赋值
-			x = other.x;
-			y = other.y;
-			z = other.z;
+			point = other.point;
 			c = other.c;
 			uv_coor = other.uv_coor;
 			normal_vector = other.normal_vector;
@@ -367,6 +368,8 @@ public:
 	Vector3 top_;
 	Vector3 look_point_;
 	float radius = 300.f;
+	Matrix translate = Matrix(4, 4);
+	Matrix rotate = Matrix(4, 4);
 
 	float pitch_;
 	float yaw_;
@@ -397,6 +400,10 @@ public:
 	Vector3 GetTop() { return top_; };
 
 	Vector3 GetLookat() { 
+		return lookat_;
+	};
+
+	void UpdateLookat() { 
 		Matrix pitch_rotate = Matrix();
 		Matrix yaw_rotate = Matrix();
 		Matrix roll_rotate = Matrix();
@@ -427,16 +434,57 @@ public:
 		roll_rotate.m[2][2] = cos(roll);
 		roll_rotate.m[3][3] = 1.f;
 		
-		Matrix lookat_m = lookat_.VectorToMatrix();
+		Matrix lookat_m = Vector3(0, 0, -1).VectorToMatrix();
 		Matrix lookat_matrix = pitch_rotate * yaw_rotate * roll_rotate * lookat_m;
 
-		//lookat_.x = lookat_matrix.m[0][0];
-		//lookat_.y = lookat_matrix.m[1][0];
-		//lookat_.z = lookat_matrix.m[2][0];
-		Vector3 la = Vector3(lookat_matrix.m[0][0], lookat_matrix.m[1][0], lookat_matrix.m[2][0]);
+		lookat_.x = lookat_matrix.m[0][0];
+		lookat_.y = lookat_matrix.m[1][0];
+		lookat_.z = lookat_matrix.m[2][0];
+
+		// 临时写的围绕原点转圈
+		location_ = lookat_.Normalize() * -300;
 		
-		return la.Normalize();
 	};
+
+	void CalculateMatrix()
+	{
+		Vector3 e = GetLocation();
+		Vector3 g = GetLookat();
+		Vector3 top = GetTop();
+
+		//g = (g - e).Normalize();
+		g = g.Normalize();
+
+		// 视角变换
+		translate.m[0][0] = 1.f;
+		translate.m[1][1] = 1.f;
+		translate.m[2][2] = 1.f;
+		translate.m[3][3] = 1.f;
+		translate.m[0][3] = -e.x;
+		translate.m[1][3] = -e.y;
+		translate.m[2][3] = -e.z;
+
+		Vector3 r = g.CrossProduct(top).Normalize();
+
+		// 矫正相机top向量
+		Vector3 t = r.CrossProduct(g).Normalize();
+
+		// 旋转矩阵的逆矩阵
+		Matrix rotate_inverse(4, 4);
+		rotate_inverse.m[0][0] = r.x;
+		rotate_inverse.m[1][0] = r.y;
+		rotate_inverse.m[2][0] = r.z;
+		rotate_inverse.m[0][1] = t.x;
+		rotate_inverse.m[1][1] = t.y;
+		rotate_inverse.m[2][1] = t.z;
+		rotate_inverse.m[0][2] = -g.x;
+		rotate_inverse.m[1][2] = -g.y;
+		rotate_inverse.m[2][2] = -g.z;
+		rotate_inverse.m[3][3] = 1.f;
+
+		// 旋转矩阵
+		rotate = rotate_inverse.transpose();
+	}
 };
 
 
@@ -444,11 +492,16 @@ public:
 MyColor ReadMatiral(unsigned char* material_data, const Vector2& uv, int img_width, int img_height) {
 	int channels = 3;
 
-	float u = uv.x;
-	float v = uv.y;
+	if (std::isnan(uv.x))
+	{
+		int is  = 0;
+	}
+	
+	float u = Clamp(uv.x, 0.01f, 0.999f);
+	float v = Clamp(uv.y, 0.01f, 0.999f);
 
-	int x = round(u * img_width - 1);
-	int y = round(v * img_height - 1);
+	int x = round(u * (img_width - 1));
+	int y = round(v * (img_height - 1));
 
 	int index = (y * img_width + x) * channels;
 	float r = (float)material_data[index + 0];
@@ -463,64 +516,16 @@ MyColor ReadMatiral(unsigned char* material_data, const Vector2& uv, int img_wid
 	return color;
 }
 
+Matrix pers_proj(4, 4);
+
 // MVP算法
 float MVP(Vector3& point, Camera& camera) {
 	
 	// Vector转换为Matrix方便计算
 	Matrix point_matrix = point.PointToMatrix();
 
-	Vector3 e = camera.GetLocation();
-	Vector3 g = camera.GetLookat();
-	Vector3 top = camera.GetTop();
-
-	//g = (g - e).Normalize();
-	g = g.Normalize();
-
-	// 视角变换
-	Matrix translate(4, 4);
-	translate.m[0][0] = 1.f;
-	translate.m[1][1] = 1.f;
-	translate.m[2][2] = 1.f;
-	translate.m[3][3] = 1.f;
-	translate.m[0][3] = -e.x;
-	translate.m[1][3] = -e.y;
-	translate.m[2][3] = -e.z;
-
-	Vector3 r = g.CrossProduct(top).Normalize();
-
-	// 矫正相机top向量
-	Vector3 t = r.CrossProduct(g).Normalize();
-
-	// 旋转矩阵的逆矩阵
-	Matrix rotate_inverse(4, 4);
-	rotate_inverse.m[0][0] = r.x;
-	rotate_inverse.m[1][0] = r.y;
-	rotate_inverse.m[2][0] = r.z;
-	rotate_inverse.m[0][1] = t.x;
-	rotate_inverse.m[1][1] = t.y;
-	rotate_inverse.m[2][1] = t.z;
-	rotate_inverse.m[0][2] = -g.x;
-	rotate_inverse.m[1][2] = -g.y;
-	rotate_inverse.m[2][2] = -g.z;
-	rotate_inverse.m[3][3] = 1.f;
-
-	// 旋转矩阵
-	Matrix rotate = rotate_inverse.transpose();
-
-	point_matrix = translate * point_matrix;
-	point_matrix = rotate * point_matrix;
-
-	Matrix pers_proj(4, 4);
-
-	// 投影变换
-	float z_near = -1.f;
-	float z_far = -500.f;
-
-	pers_proj.m[0][0] = z_near / 1.f;
-	pers_proj.m[1][1] = z_near / 1.f;
-	pers_proj.m[2][2] = (z_near + z_far) / (z_far - z_near);
-	pers_proj.m[2][3] = -1 * (2 * z_near * z_far) / (z_far - z_near);
-	pers_proj.m[3][2] = 1.f;
+	point_matrix = camera.translate * point_matrix;
+	point_matrix = camera.rotate * point_matrix;
 
 	//pers_proj.m[0][0] = z_near;
 	//pers_proj.m[1][1] = z_near;
@@ -533,8 +538,7 @@ float MVP(Vector3& point, Camera& camera) {
 	point.x = point_matrix.m[0][0];
 	point.y = point_matrix.m[1][0];
 	point.z = point_matrix.m[2][0];
-
-
+	
 	return point_matrix.m[3][0];
 }
 
@@ -578,13 +582,13 @@ void ProjectiveDivision(Vector3& point, float w) {
 void DrawTriangle_LinebyLine(HDC& hdc, VertexInfo p1, VertexInfo p2, VertexInfo p3, float* z_buffer, uint32_t* backbuffer) {
 	
 	// 首先确保三个坐标顺序
-	if (p1.y < p2.y) std::swap(p1, p2);
-	if (p1.y < p3.y) std::swap(p1, p3);
-	if (p2.y < p3.y) std::swap(p2, p3);
+	if (p1.point.y < p2.point.y) std::swap(p1, p2);
+	if (p1.point.y < p3.point.y) std::swap(p1, p3);
+	if (p2.point.y < p3.point.y) std::swap(p2, p3);
 
-	Vector3 v1 = Vector3(p1.x, p1.y, p1.z);
-	Vector3 v2 = Vector3(p2.x, p2.y, p2.z);
-	Vector3 v3 = Vector3(p3.x, p3.y, p3.z);
+	Vector3 v1 = Vector3(p1.point.x, p1.point.y, p1.point.z);
+	Vector3 v2 = Vector3(p2.point.x, p2.point.y, p2.point.z);
+	Vector3 v3 = Vector3(p3.point.x, p3.point.y, p3.point.z);
 
 	MyColor c1 = p1.c;
 	MyColor c2 = p2.c;
@@ -650,132 +654,144 @@ void DrawTriangle_LinebyLine(HDC& hdc, VertexInfo p1, VertexInfo p2, VertexInfo 
 }
 
 
+// =========================================================================================
 // 片元着色器：重心坐标插值
-void DrawTriangle_BarycentricCoordinates(HDC& hdc, Camera& camera, VertexInfo p1, VertexInfo p2, VertexInfo p3, float* z_buffer, uint32_t* backbuffer, unsigned char* material_data, int img_width, int img_height) {
+void DDDDDrawTriangle_BarycentricCoordinates(HDC& hdc, Camera& camera, const VertexInfo& p1, const VertexInfo& p2, const VertexInfo& p3, float* z_buffer, uint32_t* backbuffer, unsigned char* material_data, int img_width, int img_height) {
 
 	// 光照方向
 	Vector3 light_dir = Vector3(-1, 1, -1).Normalize();
 
 	// 首先确保三个坐标顺序
-	if (p1.y < p2.y) std::swap(p1, p2);
-	if (p1.y < p3.y) std::swap(p1, p3);
-	if (p2.y < p3.y) std::swap(p2, p3);
+	Vector3 v1 = Vector3(p1.point.x, p1.point.y, p1.point.z);
+	Vector3 v2 = Vector3(p2.point.x, p2.point.y, p2.point.z);
+	Vector3 v3 = Vector3(p3.point.x, p3.point.y, p3.point.z);
 
-	Vector3 v1 = Vector3(p1.x, p1.y, p1.z);
-	Vector3 v2 = Vector3(p2.x, p2.y, p2.z);
-	Vector3 v3 = Vector3(p3.x, p3.y, p3.z);
+	Vector2 va = Vector2(p1.point.x, p1.point.y);
+	Vector2 vb = Vector2(p2.point.x, p2.point.y);
+	Vector2 vc = Vector2(p3.point.x, p3.point.y);
 
 	float total_height = v1.y - v3.y;
 	float down_height = v2.y - v3.y;
 	float up_height = v1.y - v2.y;
-	
-	for (float i = 0; i <= total_height; i++) {
-		// 确定每条扫描线的起始位置
-		Vector3 start = (v1 - v3) * (i / total_height) + v3;
-		if (start.y > 900.f) break;
-		Vector3 end;
 
-		float t1 = 0.f;
-		if (i <= down_height) {
-			t1 = i / down_height;
-			end = (v2 - v3) * t1 + v3;
-		}
-		else {
-			t1 = (i - down_height) / up_height;
-			end = (v1 - v2) * t1 + v2;
-		}
+	int minX = static_cast<int>(min(v1.x, min(v2.x, v3.x)));
+	int maxX = static_cast<int>(max(v1.x, max(v2.x, v3.x)));
+	int minY = static_cast<int>(min(v1.y, min(v2.y, v3.y)));
+	int maxY = static_cast<int>(max(v1.y, max(v2.y, v3.y)));
 
-		// 确保start在左边
-		if (start.x > end.x) {
-			std::swap(start, end);
-		}
-
-		// 画每一条扫描线的pixel
-		float total_width = end.x - start.x;
-		for (float j = start.x; j <= end.x; j++) {
+	for (int y = minY; y <= maxY; y++)
+	{
+		if (y > height or y < 0.f) break;
+		for (int x = minX; x <= maxX; x++)
+		{
+			if (x > width or x < 0.f) break;
+			Vector2 p = Vector2(x + 0.5f, y + 0.5f);
 			
-			// 当前着色点的坐标
-			float x = j;
-			float y = i + v3.y;
+			Vector2 edge0 = vb - va;
+			Vector2 ap = p - va;
+			bool r1 = edge0.CrossProduct(ap);
 
-			if (x > 900.f) break;
+			Vector2 edge1 = vc - vb;
+			Vector2 bp = p - vb;
+			bool r2 = edge1.CrossProduct(bp);
 
-			// 重心坐标系数
-			float a = (-(x - v2.x) * (v3.y - v2.y) + (y - v2.y) * (v3.x - v2.x)) / (-(v1.x - v2.x) * (v3.y - v2.y) + (v1.y - v2.y) * (v3.x - v2.x));
-			float b = (-(x - v3.x) * (v1.y - v3.y) + (y - v3.y) * (v1.x - v3.x)) / (-(v2.x - v3.x) * (v1.y - v3.y) + (v2.y - v3.y) * (v1.x - v3.x));
-			float c = 1 - a - b;
-			
-			if (not (a >= 0 and b >= 0 and c >= 0)) continue;
-			
-			// 进行透视矫正，并插值计算各个值
-			float w1 = p1.w;
-			float w2 = p2.w;
-			float w3 = p3.w;
-			float w_inverse = (1 / w1) * a + (1 / w2) * b + (1 / w3) * c;
+			Vector2 edge2 = va - vc;
+			Vector2 cp = p - vc;
+			bool r3 = edge2.CrossProduct(cp);
 
-			// 利用世界空间坐标计算 施加高光时需要的视角方向
-			Vector3 wp1 = p1.world_position * (1 / w1);
-			Vector3 wp2 = p2.world_position * (1 / w2);
-			Vector3 wp3 = p3.world_position * (1 / w3);
-			Vector3 wp = wp1 * a + wp2 * b + wp3 * c;
-			wp = wp * (1 / w_inverse);
-			Vector3 v = (wp - camera.GetLocation()).Normalize();
+			if ((r1 == true and r2 == true && r3 == true) || (r1 == false && r2 == false && r3 == false))
+			{
+				// 重心坐标系数
+				float a = (-(x - v2.x) * (v3.y - v2.y) + (y - v2.y) * (v3.x - v2.x)) / (-(v1.x - v2.x) * (v3.y - v2.y) + (v1.y - v2.y) * (v3.x - v2.x));
+				float b = (-(x - v3.x) * (v1.y - v3.y) + (y - v3.y) * (v1.x - v3.x)) / (-(v2.x - v3.x) * (v1.y - v3.y) + (v2.y - v3.y) * (v1.x - v3.x));
+				float c = 1 - a - b;
+				
+				if (not (a >= 0 and b >= 0 and c >= 0)) continue;
+				
+				// 进行透视矫正，并插值计算各个值
+				float w1 = p1.w;
+				float w2 = p2.w;
+				float w3 = p3.w;
+				float w_inverse = (1 / w1) * a + (1 / w2) * b + (1 / w3) * c;
+				if(w_inverse == 0.f) continue;
 
-			// uv坐标的透视修正
-			Vector2 uv1 = p1.uv_coor * (1 / w1);
-			Vector2 uv2 = p2.uv_coor * (1 / w2);
-			Vector2 uv3 = p3.uv_coor * (1 / w3);
-			Vector2 uv = uv1 * a + uv2 * b + uv3 * c;
-			uv = uv * (1 / w_inverse);
+				// 利用世界空间坐标计算 施加高光时需要的视角方向
+				Vector3 wp1 = p1.world_position * (1 / w1);
+				Vector3 wp2 = p2.world_position * (1 / w2);
+				Vector3 wp3 = p3.world_position * (1 / w3);
+				Vector3 wp = wp1 * a + wp2 * b + wp3 * c;
+				wp = wp * (1 / w_inverse);
+				Vector3 v = (wp - camera.GetLocation()).Normalize();
 
-			// 法线的透视修正
-			Vector3 normal1 = p1.normal_vector * (1 / w1);
-			Vector3 normal2 = p2.normal_vector * (1 / w2);
-			Vector3 normal3 = p3.normal_vector * (1 / w3);
-			Vector3 normal = normal1 * a + normal2 * b + normal3 * c;
-			normal = (normal * (1 / w_inverse)).Normalize();
-			
-			// 深度测试用的就是投影变换后的z值，不需要也不能透视修正
-			float z_depth = p1.z * a + p2.z * b + p3.z * c;
-
-			int key = int(y) * width + int(x);
-			if (x < 900.f and x > 0.f and y < 900.f and y > 0.f) {
-				if (z_buffer[key] == 0.f or (z_buffer[key] != 0.f and z_depth < z_buffer[key])) {
-					z_buffer[key] = z_depth;
-					
-					// 读取材质贴图信息
-					MyColor color = ReadMatiral(material_data, uv, img_width, img_height);
-
-					// 施加光照: Phong-Shading, 基于像素的光照计算
-					float Intensity = 1.0f;
-
-					// 计算光照：Blinn-Phong光照模型：漫反射光 + 高光 + 环境光。
-					// 使用的是平行光，即，未实现光照强度随光源距离的衰减，光照强度是写死的。
-					MyColor light_diffuse = color * max(0, normal.DotProduct(light_dir * -1)) * Intensity;
-					MyColor light_specular = MyColor(255, 255, 255) * pow(max(0, ((light_dir * (-1) - v).Normalize()).DotProduct(normal)), 256) * Intensity;
-					MyColor light_ambient = color * 0.2f;
-
-					color = light_diffuse + light_specular + light_ambient;
-					color.r = Clamp(color.r, 0.f, 255.f);
-					color.g = Clamp(color.g, 0.f, 255.f);
-					color.b = Clamp(color.b, 0.f, 255.f);
-					
-					// 存储像素信息到backbuffer
-					uint32_t red = static_cast<uint32_t>(color.r);
-					uint32_t green = static_cast<uint32_t>(color.g);
-					uint32_t blue = static_cast<uint32_t>(color.b);
-					uint32_t alpha = 0xff;
-					backbuffer[key] = alpha << 24 | red << 16 | green << 8 | blue;
-
-
-					//SetPixelV(hdc, x, y, RGB(color.r, color.g, color.b));
+				// uv坐标的透视修正
+				Vector2 uv1 = p1.uv_coor * (1 / w1);
+				Vector2 uv2 = p2.uv_coor * (1 / w2);
+				Vector2 uv3 = p3.uv_coor * (1 / w3);
+				Vector2 uv = uv1 * a + uv2 * b + uv3 * c;
+				uv = uv * (1 / w_inverse);
+				if(std::isnan(uv.x))
+				{
+					uv.x = 0.0f;
+					uv.y = 0.0f;
 				}
 
-			}
-		}
+				// 法线的透视修正
+				Vector3 normal1 = p1.normal_vector * (1 / w1);
+				Vector3 normal2 = p2.normal_vector * (1 / w2);
+				Vector3 normal3 = p3.normal_vector * (1 / w3);
+				Vector3 normal = normal1 * a + normal2 * b + normal3 * c;
+				normal = (normal * (1 / w_inverse)).Normalize();
+				
+				// 深度测试用的就是投影变换后的z值，不需要也不能透视修正
+				float z_depth = p1.point.z * a + p2.point.z * b + p3.point.z * c;
 
+				int key = y * width + x;
+				if (x < 900.f and x > 0.f and y < 900.f and y > 0.f) {
+					if (z_buffer[key] == 0.f or (z_buffer[key] != 0.f and z_depth < z_buffer[key])) {
+						z_buffer[key] = z_depth;
+						
+						// 读取材质贴图信息
+						MyColor color = ReadMatiral(material_data, uv, img_width, img_height);
+						// MyColor color = MyColor(100, 100, 100);
+
+						// 施加光照: Phong-Shading, 基于像素的光照计算
+						float Intensity = 2.0f;
+
+						// 计算光照：Blinn-Phong光照模型：漫反射光 + 高光 + 环境光。
+						// 使用的是平行光，即，未实现光照强度随光源距离的衰减，光照强度是写死的。
+						MyColor light_diffuse = color * max(0, normal.DotProduct(light_dir * -1)) * Intensity;
+						MyColor light_specular = MyColor(255, 255, 255) * pow(max(0, ((light_dir * (-1) - v).Normalize()).DotProduct(normal)), 256) * Intensity;
+						MyColor light_ambient = color * 0.3f;
+
+						color = light_diffuse + light_specular + light_ambient;
+						color.r = Clamp(color.r, 0.f, 255.f);
+						color.g = Clamp(color.g, 0.f, 255.f);
+						color.b = Clamp(color.b, 0.f, 255.f);
+						
+						// 存储像素信息到backbuffer
+						uint32_t red = static_cast<uint32_t>(color.r);
+						uint32_t green = static_cast<uint32_t>(color.g);
+						uint32_t blue = static_cast<uint32_t>(color.b);
+						uint32_t alpha = 0xff;
+						backbuffer[key] = alpha << 24 | red << 16 | green << 8 | blue;
+
+
+						//SetPixelV(hdc, x, y, RGB(color.r, color.g, color.b));
+					}
+
+				}
+			}
+			
+		}
 	}
 }
+// =========================================================================================
+
+
+
+
+
+
 
 
 
@@ -783,8 +799,8 @@ void DrawTriangle_BarycentricCoordinates(HDC& hdc, Camera& camera, VertexInfo p1
 void Render(HDC& hdc, Camera& camera, const std::vector<Triangle>& triangles, uint32_t* backbuffer, float* z_buffer, unsigned char* material_data, int img_width, int img_height) {
 
 	// 给每个三角形进行线性插值上色
-	for (Triangle t : triangles) {
-		DrawTriangle_BarycentricCoordinates(hdc, camera, t.v1, t.v2, t.v3, z_buffer, backbuffer, material_data, img_width, img_height);
+	for (const Triangle& t : triangles) {
+		DDDDDrawTriangle_BarycentricCoordinates(hdc, camera, t.v1, t.v2, t.v3, z_buffer, backbuffer, material_data, img_width, img_height);
 	}
 
 	BITMAPINFO bmi = { 0 };
@@ -804,15 +820,15 @@ void Render(HDC& hdc, Camera& camera, const std::vector<Triangle>& triangles, ui
 
 
 // 三角形背面剔除
-std::vector<std::vector<int>> RemoveBackTriangles(Camera& camera, std::vector<std::vector<int>> triangles, std::vector<Vector3>& points, RenderState renderstate = RenderState::RenderAll) {
+std::vector<std::vector<int>> RemoveBackTriangles(Camera& camera, std::vector<std::vector<int>>& triangles, std::vector<VertexInfo>& vertexes, RenderState renderstate = RenderState::RenderAll) {
 	
 	Vector3 lookdir = camera.GetLookat();
 
 	std::vector<std::vector<int>> new_triangles = std::vector<std::vector<int>>();
 
 	for (int i = 0; i < triangles.size(); i++) {
-		Vector3 b1 = points[triangles[i][1] - 1] - points[triangles[i][0] - 1];
-		Vector3 b2 = points[triangles[i][2] - 1] - points[triangles[i][0] - 1];
+		Vector3 b1 = vertexes[triangles[i][1]].point - vertexes[triangles[i][0]].point;
+		Vector3 b2 = vertexes[triangles[i][2]].point - vertexes[triangles[i][0]].point;
 		Vector3 n = b1.Normalize().CrossProduct(b2.Normalize()).Normalize();
 		n = n * (-1); // 因为窗口的左上角才是原点，y轴被倒置，所以法线向量应该取反。
 
@@ -821,14 +837,14 @@ std::vector<std::vector<int>> RemoveBackTriangles(Camera& camera, std::vector<st
 		{
 		case RenderState::Counterclockwise:
 
-			if (lookdir.DotProduct(n) < 0) {
+			if (lookdir.DotProduct(n) <= 0) {
 				new_triangles.push_back(triangles[i]);
 			}
 			break;
 
 		case RenderState::Clockwise:
 
-			if (lookdir.DotProduct(n) > 0) {
+			if (lookdir.DotProduct(n) >= 0) {
 				new_triangles.push_back(triangles[i]);
 			}
 			break;
@@ -845,14 +861,11 @@ std::vector<std::vector<int>> RemoveBackTriangles(Camera& camera, std::vector<st
 	return new_triangles;
 }
 
+
 // 三角形裁剪
 std::vector<std::vector<int>> CuteTriangles(
 	std::vector<std::vector<int>>& triangles, 
-	std::vector<Vector3>& points, 
-	std::vector<float>& w_value, 
-	std::vector<Vector2>& uv_coordinate,
-	std::vector<Vector3>& normal_vectors,
-	std::vector<Vector3>& world_positions) {
+	std::vector<VertexInfo>& vertexes) {
 
 	// 需要剔除的三角形序号集合
 	std::unordered_set<int> cut_triangles = std::unordered_set<int>();
@@ -865,25 +878,25 @@ std::vector<std::vector<int>> CuteTriangles(
 		int i2 = triangles[i][1];
 		int i3 = triangles[i][2];
 
-		float w1 = w_value[triangles[i][0] - 1];
-		float w2 = w_value[triangles[i][1] - 1];
-		float w3 = w_value[triangles[i][2] - 1];
+		float w1 = vertexes[triangles[i][0]].w;
+		float w2 = vertexes[triangles[i][1]].w;
+		float w3 = vertexes[triangles[i][2]].w;
 
-		Vector3 p1 = points[triangles[i][0] - 1];
-		Vector3 p2 = points[triangles[i][1] - 1];
-		Vector3 p3 = points[triangles[i][2] - 1];
+		Vector3 p1 = vertexes[triangles[i][0]].point;
+		Vector3 p2 = vertexes[triangles[i][1]].point;
+		Vector3 p3 = vertexes[triangles[i][2]].point;
 
-		Vector2 uv1 = uv_coordinate[triangles[i][0] - 1];
-		Vector2 uv2 = uv_coordinate[triangles[i][1] - 1];
-		Vector2 uv3 = uv_coordinate[triangles[i][2] - 1];
+		Vector2 uv1 = vertexes[triangles[i][0]].uv_coor;
+		Vector2 uv2 = vertexes[triangles[i][1]].uv_coor;
+		Vector2 uv3 = vertexes[triangles[i][2]].uv_coor;
 
-		Vector3 normal1 = normal_vectors[triangles[i][0] - 1];
-		Vector3 normal2 = normal_vectors[triangles[i][1] - 1];
-		Vector3 normal3 = normal_vectors[triangles[i][2] - 1];
+		Vector3 normal1 = vertexes[triangles[i][0]].normal_vector;
+		Vector3 normal2 = vertexes[triangles[i][1]].normal_vector;
+		Vector3 normal3 = vertexes[triangles[i][2]].normal_vector;
 
-		Vector3 wp1 = world_positions[triangles[i][0] - 1];
-		Vector3 wp2 = world_positions[triangles[i][1] - 1];
-		Vector3 wp3 = world_positions[triangles[i][2] - 1];
+		Vector3 wp1 = vertexes[triangles[i][0] - 1].world_position;
+		Vector3 wp2 = vertexes[triangles[i][1] - 1].world_position;
+		Vector3 wp3 = vertexes[triangles[i][2] - 1].world_position;
 
 
 		// 首先，剔除所有不在视锥体里面的
@@ -926,6 +939,7 @@ std::vector<std::vector<int>> CuteTriangles(
 					}
 
 					// 计算出交点和交点的颜色值
+					// 原理：(p1.z+t⋅(p2.z−p1.z))+(w1+t⋅(w2−w1))=0
 					float t1 = -(p1.z + w1) / ((p2.z - p1.z) + (w2 - w1));
 					float t2 = -(p1.z + w1) / ((p3.z - p1.z) + (w3 - w1));
 
@@ -945,19 +959,23 @@ std::vector<std::vector<int>> CuteTriangles(
 					Vector3 wp_ins2 = wp1 + (wp3 - wp1) * t2;
 
 					// 将新生成的点的位置和颜色信息压入
-					points.push_back(ins1);
-					w_value.push_back(wins1);
-					uv_coordinate.push_back(uv_ins1);
-					normal_vectors.push_back(normal_ins1);
-					world_positions.push_back(wp_ins1);
-					int index1 = points.size(); // 新生成的点对应的index
+					VertexInfo new_vertex1 = VertexInfo();
+					new_vertex1.point = ins1;
+					new_vertex1.w = wins1;
+					new_vertex1.uv_coor = uv_ins1;
+					new_vertex1.normal_vector = normal_ins1;
+					new_vertex1.world_position = wp_ins1;
+					vertexes.push_back(new_vertex1);
+					int index1 = vertexes.size(); // 新生成的点对应的index
 
-					points.push_back(ins2);
-					w_value.push_back(wins2);
-					uv_coordinate.push_back(uv_ins2);
-					normal_vectors.push_back(normal_ins2);
-					world_positions.push_back(wp_ins2);
-					int index2 = points.size(); // 新生成的点对应的index
+					VertexInfo new_vertex2 = VertexInfo();
+					new_vertex2.point = ins2;
+					new_vertex2.w = wins2;
+					new_vertex2.uv_coor = uv_ins2;
+					new_vertex2.normal_vector = normal_ins2;
+					new_vertex2.world_position = wp_ins2;
+					vertexes.push_back(new_vertex2);
+					int index2 = vertexes.size(); // 新生成的点对应的index
 
 					// 将新三角形塞入待渲染列表
 					if (inverse) {
@@ -1013,19 +1031,23 @@ std::vector<std::vector<int>> CuteTriangles(
 					Vector3 wp_ins2 = wp1 + (wp3 - wp1) * t2;
 
 					// 将新生成的点的位置和颜色信息压入
-					points.push_back(ins1);
-					w_value.push_back(wins1);
-					uv_coordinate.push_back(uv_ins1);
-					normal_vectors.push_back(normal_ins1);
-					world_positions.push_back(wp_ins1);
-					int index1 = points.size(); // 新生成的点对应的index
+					VertexInfo new_vertex1 = VertexInfo();
+					new_vertex1.point = ins1;
+					new_vertex1.w = wins1;
+					new_vertex1.uv_coor = uv_ins1;
+					new_vertex1.normal_vector = normal_ins1;
+					new_vertex1.world_position = wp_ins1;
+					vertexes.push_back(new_vertex1);
+					int index1 = vertexes.size(); // 新生成的点对应的index
 
-					points.push_back(ins2);
-					w_value.push_back(wins2);
-					uv_coordinate.push_back(uv_ins2);
-					normal_vectors.push_back(normal_ins2);
-					world_positions.push_back(wp_ins2);
-					int index2 = points.size(); // 新生成的点对应的index
+					VertexInfo new_vertex2 = VertexInfo();
+					new_vertex2.point = ins2;
+					new_vertex2.w = wins2;
+					new_vertex2.uv_coor = uv_ins2;
+					new_vertex2.normal_vector = normal_ins2;
+					new_vertex2.world_position = wp_ins2;
+					vertexes.push_back(new_vertex2);
+					int index2 = vertexes.size(); // 新生成的点对应的index
 
 					// 将新三角形塞入待渲染列表
 					if (inverse) {
@@ -1162,7 +1184,7 @@ void RenderCube(HDC& hdc, Camera& camera, const Vector3& start, float length, fl
 
 	// 基于视锥的三角形裁剪：只实现了基于近裁面的裁剪
 	std::vector<std::vector<int>> new_triangles = std::vector<std::vector<int>>();
-	new_triangles = CuteTriangles(triangles, points, w_value, uv_coordinate, normal_vectors, world_positions);
+	// new_triangles = CuteTriangles(triangles, points, w_value, uv_coordinate, normal_vectors, world_positions);
 	
 
 	// 透视除法
@@ -1171,7 +1193,7 @@ void RenderCube(HDC& hdc, Camera& camera, const Vector3& start, float length, fl
 	}
 
 	// 背面裁剪
-	new_triangles = RemoveBackTriangles(camera, new_triangles, points, RenderState::Counterclockwise);
+	// new_triangles = RemoveBackTriangles(camera, new_triangles, points, RenderState::Counterclockwise);
 
 	// 视口变换
 	for (int i = 0; i < points.size(); i++) {
@@ -1225,110 +1247,47 @@ void RenderCube(HDC& hdc, Camera& camera, const Vector3& start, float length, fl
 
 
 
+std::vector<VertexInfo> vertexes = std::vector<VertexInfo>();
 
 
-// 画OBJ文件(尚未完成)
-void Draw(HDC& hdc, Camera& camera, uint32_t* backbuffer, float* z_buffer, unsigned char* material_data, int img_width, int img_height, 
-	tinyobj::attrib_t attrib, std::vector<tinyobj::shape_t> shapes) {
+// 画OBJ文件
+void Draw(HDC& hdc, Camera& camera, uint32_t* backbuffer, float* z_buffer, unsigned char* material_data, int img_width, int img_height,
+	std::vector<Vector3>& points, std::vector<Vector3>& world_positions, std::vector<Vector2>& uv_coordinate, std::vector<Vector3>& normal_vectors, std::vector<std::vector<int>> triangles) {
 
-	// 现在的逻辑中：以下的变量都还只是顶点和索引池子，并没有实现poins，uv_coordinate, normal_vectors的一一对应
-	std::vector<std::vector<int>> triangles{};
-
-	std::vector<Vector3> points = {};
-
-	std::vector<Vector3> world_positions = {};
-
-	std::vector<float> w_value = {};
-
-	std::vector<Vector2> uv_coordinate = std::vector<Vector2>();
-
-	std::vector<Vector3> normal_vectors = std::vector<Vector3>();
-
-
-	// 处理顶点数据
-	for (size_t i = 0; i < attrib.vertices.size() / 3; i++) {
-		Vector3 point = { attrib.vertices[3 * i + 0], attrib.vertices[3 * i + 1], attrib.vertices[3 * i + 2] };
-		points.push_back(point);
-		world_positions.push_back(point);
-	}
-
-	// 处理纹理坐标数据
-	for (size_t i = 0; i < attrib.texcoords.size() / 2; i++) {
-		Vector2 uv = { attrib.texcoords[2 * i + 0], attrib.texcoords[2 * i + 1] };
-		uv_coordinate.push_back(uv);
-	}
-
-	// 处理法向量数据
-	for (size_t i = 0; i < attrib.normals.size() / 3; i++) {
-		Vector3 normal = { attrib.normals[3 * i + 0], attrib.normals[3 * i + 1], attrib.normals[3 * i + 2] };
-		normal_vectors.push_back(normal);
-	}
-
-	// 遍历每个形状，提取三角形的顶点索引
-	for (const auto& shape : shapes) {
-		size_t index_offset = 0;
-
-		for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
-			int face_vertices = shape.mesh.num_face_vertices[f]; // 每个面的顶点数量（应该始终是 3）
-
-			if (face_vertices != 3) {
-				std::cerr << "Non-triangular face detected, skipping!" << std::endl;
-				index_offset += face_vertices;
-				continue;
-			}
-
-			std::vector<int> triangle; // 三角形的顶点索引
-
-			for (size_t v = 0; v < 3; v++) {
-				tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
-
-				// 顶点索引
-				int vertex_index = idx.vertex_index;
-				triangle.push_back(vertex_index);
-			}
-
-			triangles.push_back(triangle);
-			index_offset += face_vertices;
-		}
-	}
-
-	
-	// MVP变换
-	for (int i = 0; i < points.size(); i++) {
-		w_value.push_back(MVP(points[i], camera));
-	}
-
-
-	// 基于视锥的三角形裁剪：只实现了基于近裁面的裁剪
-	std::vector<std::vector<int>> new_triangles = std::vector<std::vector<int>>();
-	new_triangles = CuteTriangles(triangles, points, w_value, uv_coordinate, normal_vectors, world_positions);
-
-
-	// 透视除法
-	for (int i = 0; i < points.size(); i++) {
-		ProjectiveDivision(points[i], w_value[i]);
-	}
-
-	// 背面裁剪
-	new_triangles = RemoveBackTriangles(camera, new_triangles, points, RenderState::RenderAll);
-
-	// 视口变换
-	for (int i = 0; i < points.size(); i++) {
-		ViewportTransform(points[i]);
-	}
-
-	// 将顶点改为颜色顶点
-	std::vector<VertexInfo> vertexes = std::vector<VertexInfo>();
 	vertexes.push_back(VertexInfo());
 	for (int i = 0; i < points.size(); i++) {
 		VertexInfo vertex_info = VertexInfo(points[i].x, points[i].y, points[i].z);
 		vertex_info.normal_vector = normal_vectors[i];
 		vertex_info.uv_coor = uv_coordinate[i];
-		vertex_info.w = w_value[i];
+		vertex_info.w = 0.0f;
 		vertex_info.world_position = world_positions[i];
 		vertexes.push_back(vertex_info);
 	}
+	
+	// MVP变换
+	for (int i = 0; i < vertexes.size(); i++) {
+		vertexes[i].w = MVP(vertexes[i].point, camera);
+	}
 
+
+	// 基于视锥的三角形裁剪：只实现了基于近裁面的裁剪
+	std::vector<std::vector<int>> new_triangles = std::vector<std::vector<int>>();
+	new_triangles = CuteTriangles(triangles, vertexes);
+	// new_triangles = triangles;
+
+	// 透视除法
+	for (int i = 0; i < vertexes.size(); i++) {
+		ProjectiveDivision(vertexes[i].point, vertexes[i].w);
+	}
+
+	// 背面裁剪
+	new_triangles = RemoveBackTriangles(camera, new_triangles, vertexes, RenderState::Counterclockwise);
+ 
+	// 视口变换
+	for (int i = 0; i < vertexes.size(); i++) {
+		ViewportTransform(vertexes[i].point);
+	}
+	
 	std::vector<Triangle> ts = std::vector<Triangle>();
 
 	// 更改渲染的三角形的个数.
@@ -1340,16 +1299,21 @@ void Draw(HDC& hdc, Camera& camera, uint32_t* backbuffer, float* z_buffer, unsig
 	// 查看渲染三角形的个数
 	std::string render_info = "Number Of Triangles: ";
 	render_info += std::to_string(new_triangles.size());
-	TextOut(hdc, 1000, 150, std::wstring(render_info.begin(), render_info.end()).c_str(), 23);
+	TextOut(hdc, 1000, 150, std::wstring(render_info.begin(), render_info.end()).c_str(), 30);
 
 	// 渲染操作
 	Render(hdc, camera, ts, backbuffer, z_buffer, material_data, img_width, img_height);
+
+	vertexes.clear();
 }
 
 
 
 
-void tick() {}
+void tick()
+{
+	
+}
 
 
 
