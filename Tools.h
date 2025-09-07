@@ -674,11 +674,12 @@ void DDDDDrawTriangle_BarycentricCoordinates(HDC& hdc, Camera& camera, const Ver
 	float down_height = v2.y - v3.y;
 	float up_height = v1.y - v2.y;
 
+	// 包围盒范围
 	int minX = static_cast<int>(min(v1.x, min(v2.x, v3.x)));
 	int maxX = static_cast<int>(max(v1.x, max(v2.x, v3.x)));
 	int minY = static_cast<int>(min(v1.y, min(v2.y, v3.y)));
 	int maxY = static_cast<int>(max(v1.y, max(v2.y, v3.y)));
-
+	
 	for (int y = minY; y <= maxY; y++)
 	{
 		if (y > height or y < 0.f) break;
@@ -761,7 +762,7 @@ void DDDDDrawTriangle_BarycentricCoordinates(HDC& hdc, Camera& camera, const Ver
 						// 使用的是平行光，即，未实现光照强度随光源距离的衰减，光照强度是写死的。
 						MyColor light_diffuse = color * max(0, normal.DotProduct(light_dir * -1)) * Intensity;
 						MyColor light_specular = MyColor(255, 255, 255) * pow(max(0, ((light_dir * (-1) - v).Normalize()).DotProduct(normal)), 256) * Intensity;
-						MyColor light_ambient = color * 0.3f;
+						MyColor light_ambient = color * 0.5f;
 
 						color = light_diffuse + light_specular + light_ambient;
 						color.r = Clamp(color.r, 0.f, 255.f);
@@ -872,6 +873,7 @@ std::vector<std::vector<int>> CuteTriangles(
 
 	// 用现在的坐标进行视锥剔除和三角形裁剪
 	int triangles_num = triangles.size();
+	triangles_num = min(triangles_num, 100000); // 放置三角形太多卡死了
 	for (int i = 0; i < triangles_num; i++) {
 
 		int i1 = triangles[i][0];
@@ -900,7 +902,6 @@ std::vector<std::vector<int>> CuteTriangles(
 
 
 		// 首先，剔除所有不在视锥体里面的
-
 		bool f1 = (p1.x <= w1 or p1.x >= -w1) or (p1.y <= w1 or p1.y >= -w1) or (p1.z >= -w1);
 		bool f2 = (p2.x <= w2 or p2.x >= -w2) or (p2.y <= w2 or p2.y >= -w2) or (p2.z >= -w2);
 		bool f3 = (p3.x <= w3 or p3.x >= -w3) or (p3.y <= w3 or p3.y >= -w3) or (p3.z >= -w3);
@@ -1264,23 +1265,23 @@ void Draw(HDC& hdc, Camera& camera, uint32_t* backbuffer, float* z_buffer, unsig
 		vertexes.push_back(vertex_info);
 	}
 	
-	// MVP变换
+	// MVP变换 -> 裁剪空间
 	for (int i = 0; i < vertexes.size(); i++) {
 		vertexes[i].w = MVP(vertexes[i].point, camera);
 	}
 
-
+	// 裁剪空间内做三角形裁剪
 	// 基于视锥的三角形裁剪：只实现了基于近裁面的裁剪
 	std::vector<std::vector<int>> new_triangles = std::vector<std::vector<int>>();
 	new_triangles = CuteTriangles(triangles, vertexes);
 	// new_triangles = triangles;
 
-	// 透视除法
+	// 透视除法：裁剪空间 -> NDC空间
 	for (int i = 0; i < vertexes.size(); i++) {
 		ProjectiveDivision(vertexes[i].point, vertexes[i].w);
 	}
 
-	// 背面裁剪
+	// 背面剔除
 	new_triangles = RemoveBackTriangles(camera, new_triangles, vertexes, RenderState::Counterclockwise);
  
 	// 视口变换
@@ -1308,17 +1309,10 @@ void Draw(HDC& hdc, Camera& camera, uint32_t* backbuffer, float* z_buffer, unsig
 }
 
 
-
-
 void tick()
 {
 	
 }
-
-
-
-
-
 
 // 施加光照(废弃)------------------------------------------------废弃代码-------------------------------------------------------------------
 void AddIllumination(Camera& camera, std::vector<std::vector<int>>& triangles, std::vector<Vector3>& points, std::vector<MyColor>& colors, Vector3 light_dir) {

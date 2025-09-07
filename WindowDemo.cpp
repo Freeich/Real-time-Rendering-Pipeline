@@ -176,7 +176,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     int img_width = 0;
     int img_height = 0;
     int channels = 0;
-    unsigned char* material_data = stbi_load("sq3.jpg", &img_width, &img_height, &channels, 0);
+    unsigned char* material_data = stbi_load("sq5.jpg", &img_width, &img_height, &channels, 0);
 
     // 光照方向
     Vector3 light_dir = Vector3(-1, 1, -1);
